@@ -1,0 +1,23 @@
+/* MAP-FRAC App Styling Sheet */
+
+
+/* remove border from outer container */
+.container-all {
+  padding: 0px;
+  position: relative;
+  min-height: 100vh;
+  padding-bottom: 25rem;
+}
+
+/* change navbar color */
+/*.navbar-static-top {background-color: #1d404a}
+.navbar-default .navbar-nav>.active>a {background-color: #4d706f;} */
+
+
+/* hacky way to make leaflet darktheme */
+.leaflet-layer,
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out,
+.leaflet-control-attribution {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}

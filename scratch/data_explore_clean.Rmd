@@ -92,7 +92,9 @@ sample_sf <- sample_clean %>%
   inner_join(play_basin, by = c("Basin", "Shale_play")) %>% 
   st_as_sf() %>% 
   # convert to points
-  st_centroid()
+  st_centroid() %>% 
+  # edit lithology typo
+  mutate(Lithology = if_else(Lithology == "MIxed Shale & Chalk", "Mixed Shale & Chalk", Lithology))
 
 
 ```
@@ -115,7 +117,7 @@ genome_sf <- genome_clean %>%
 Save output dataframes to read into app
 
 ```{r}
-write_sf(sample_sf, "data/sample_app.shp")
+st_write(sample_sf, "data/sample_app.shp", append = FALSE)
 
-write_sf(genome_sf, "data/genome_app.shp")
+st_write(genome_sf, "data/genome_app.shp", append = FALSE)
 ```

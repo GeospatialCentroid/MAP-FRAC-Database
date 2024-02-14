@@ -75,7 +75,8 @@ genome_clean <- genome %>%
   mutate(Basin = str_remove_all(basin, "Basin") %>% 
            str_replace("DJ", "Denver") %>% 
            # trailing spaces were causing errors in join
-            str_remove_all(" "))
+            str_remove_all(" ")) %>% 
+  mutate(across(domain:species, ~str_remove(.x, ".*__")))
 
 ```
 

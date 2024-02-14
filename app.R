@@ -3,50 +3,103 @@
 
 # set up
 library(shiny)
+library(shinyWidgets)
+library(bslib)
 library(sf)
 library(plotly)
 library(leaflet)
-library(bslib)
+library(DT)
+
 
 # read in data
 sample <- read_sf("data/sample_app.shp") %>% 
-  st_jitter(factor = 0.009)
+  st_jitter(factor = 0.005)
 genome <- read_sf("data/genome_app.shp") %>% 
-  st_jitter(factor = 0.009)
+  st_jitter(factor = 0.005)
 
 basins <- read_sf("data/ShalePlays_US_EIA_Dec2021.shp")
 
 # Define UI -----------------
 ui <- fluidPage(
   class = "container-all",
-  theme = bslib::bs_theme(bootswatch = "darkly"),
+  theme = bslib::bs_theme(
+    version = "5",
+    bootswatch = "darkly",
+    bg = "#101010",
+    fg = "#FFF",
+    primary = "#7198ab",
+    secondary = "#F27F0c",
+    #success = "#a5c90f",
+    base_font = font_google("Inria Sans")
+  ),
   includeCSS("www/style.css"),
+  
   navbarPage(
     "MAP-FRAC Database",
     
+    # ## use shinydashboard ##
+    # header = tagList(useShinydashboard()),
     
     tabPanel(
       "Sample Explorer",
       h4("Placeholder for subheader/description of project"),
       
       fluidRow(
-        column(
-          5,
-          "Placehoder for user input selections?",
-          plotlyOutput("timeseries")
-        ),
-        column(7,
-               leafletOutput("sample_map"))
-      ),
-      fluidRow()
+        column(12,
+               card(full_screen = TRUE,
+                    layout_sidebar(
+                      open = TRUE,
+                      sidebar = sidebar(
+                        position = "right",
+                        checkboxGroupButtons("select_lith", "Filter by Lithology:",
+                                    choices = unique(sample$Lithlgy),
+                                    selected = unique(sample$Lithlgy),
+                                    individual = TRUE
+                                    ),
+                        selectizeInput("zoom_basin", "Zoom to Basin:",
+                        choices = unique(sample$basin),
+                        options = list(
+                          placeholder = 'Please select an option below',
+                          onInitialize = I('function() { this.setValue(""); }')
+                        ))),
+                        leafletOutput("sample_map")
+                      )
+                    )
+                   ),
+               card(height = 350,
+                   card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
+                   plotlyOutput("timeseries")))
+      
     ),
     tabPanel(
       "Genome Explorer",
       h4("Placeholder for subheader"),
-      fluidRow(sidebarLayout(
-        sidebarPanel("select inputs go here"),
-        mainPanel(leafletOutput("genome_map"))
-      ))
+                      card(full_screen = TRUE,
+                           layout_sidebar(
+                             open = TRUE, 
+                             sidebar = sidebar(
+                               position = "left",
+                               accordion(open = FALSE,
+                                 accordion_panel("Filter by Taxonomy:",
+                                   selectizeGroupUI(id = "taxonomy_filter",
+                                                                  inline = FALSE,
+                                                                  params = list(
+                                                                    domain = list(inputId = "domain", title = "Domain:"),
+                                                                    phylum = list(inputId = "phylum", title = "Phylum:"),
+                                                                    class = list(inputId = "class", title = "Class:"),
+                                                                    order = list(inputId = "order", title = "Order:"),
+                                                                    family = list(inputId = "family", title = "Family:"),
+                                                                    genus = list(inputId = "genus", title = "Genus:"),
+                                                                    species = list(inputId = "species", title = "Species:")
+                                                                  )))
+                                 )
+                              
+                               ),
+                             leafletOutput("genome_map")
+                           )
+      ),
+      card(DT::dataTableOutput("genome_table"))
+      
     )
     
   )
@@ -55,20 +108,73 @@ ui <- fluidPage(
 # Define server -----------------
 server <- function(input, output) {
 
-  #sample plotly (test)
+  ## sample plotly (test) ----
   output$timeseries <- plotly::renderPlotly({
-    plot_ly()
+    plot_ly(height = 250)
   })
 
-  #sample map
+  ## sample map ----
   output$sample_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
-      addPolygons(data = basins) %>%
+      addPolygons(data = basins, stroke = FALSE, fillOpacity = 0.5, fillColor = "#91B187") %>%
       addCircleMarkers(data = sample,
                        radius = 6,
-                       color = "yellow")
+                       stroke = FALSE,
+                       fillOpacity = 0.5,
+                       fillColor = "#F7AD19")
   })
+
+  
+  ### zoom to basin ------
+  observeEvent(input$zoom_basin, {
+    
+    if (input$zoom_basin == "") {
+      leafletProxy("sample_map")
+    } else {
+    
+    zoom <- reactive({
+      sample %>%
+        filter(basin == input$zoom_basin) %>%
+        st_bbox() %>%
+        st_as_sfc(crs = st_crs(sample)) %>%
+        st_centroid() %>%
+        st_coordinates()
+
+    })
+
+    leafletProxy('sample_map') %>%
+      setView(lng = zoom()[1], lat = zoom()[2], zoom = 7)
+    }
+
+
+  })
+  
+  
+  ## select taxonomy
+  taxa_mod <- callModule(
+    module = selectizeGroupServer,
+    id = "taxonomy_filter",
+    inline = FALSE,
+    data = st_drop_geometry(genome),
+    vars = c("domain", "phylum", "class", "order", "family", "genus", "species")
+  )
+  output$genome_table <- DT::renderDataTable(taxa_mod())
+  
+  
+  ## genome map -----
+  output$genome_map <- leaflet::renderLeaflet({
+    leaflet() %>%
+      addProviderTiles("OpenStreetMap") %>%
+      addPolygons(data = basins, stroke = FALSE, fillOpacity = 0.7, fillColor = "#91B187") %>%
+      addCircleMarkers(data = genome,
+                       radius = 6,
+                       stroke = FALSE,
+                       fillOpacity = 0.5,
+                       fillColor = "#F7AD19")
+  })
+  
+
 
 }
 

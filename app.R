@@ -12,12 +12,16 @@ library(DT)
 
 
 # read in data
-sample <- read_sf("data/sample_app.shp") %>% 
-  st_jitter(factor = 0.005)
-genome <- read_sf("data/genome_app.shp") %>% 
-  st_jitter(factor = 0.005)
+load("data/app_data.RData")
+
+sample_app <- st_jitter(sample_app, factor = 0.005)
+genome_app <- st_jitter(genome_app, factor = 0.005)
 
 basins <- read_sf("data/ShalePlays_US_EIA_Dec2021.shp")
+
+# create summarized sample file for map
+sample_sum <- sample_app %>% 
+  distinct(well_ID, .keep_all = TRUE)
 
 # Define UI -----------------
 ui <- fluidPage(
@@ -117,12 +121,29 @@ server <- function(input, output) {
   output$sample_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
-      addPolygons(data = basins, stroke = FALSE, fillOpacity = 0.5, fillColor = "#91B187") %>%
-      addCircleMarkers(data = sample,
-                       radius = 6,
-                       stroke = FALSE,
-                       fillOpacity = 0.5,
-                       fillColor = "#F7AD19")
+      addPolygons(
+        data = basins,
+        stroke = FALSE,
+        fillOpacity = 0.5,
+        fillColor = "#91B187"
+      ) %>%
+      addCircleMarkers(
+        data = sample_sum,
+        radius = ~ sqrt(n_samples) * 5,
+        stroke = FALSE,
+        fillOpacity = 0.5,
+        fillColor = "#F7AD19",
+        popup = paste(
+          "Well:",
+          sample_sum$well_ID,
+          "<br>",
+          paste("Basin:", sample_sum$Basin),
+          "<br>",
+          paste("Number of Samples:", sample_sum$n_samples),
+          "<br>",
+          paste("Max days since frack:", sample_sum$max_days_since_frack)
+        )
+      )
   })
 
   

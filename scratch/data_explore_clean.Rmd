@@ -84,8 +84,9 @@ Now join both dataframes to shapefile (missing basin names will be dropped for n
 
 ```{r}
 # trailing spaces causing errors in join
-play_basin <- play_basin %>% 
-  mutate(Basin = str_remove_all(Basin, " "))
+play_basin <- play_basin %>%
+  mutate(Basin = str_remove_all(Basin, " ") %>%
+           str_remove_all(., "Basin"))
   
 
 sample_sf <- sample_clean %>% 
@@ -107,17 +108,48 @@ play_basin_merge <- play_basin %>%
   summarise(geometry = st_union(geometry)) %>% 
   ungroup()
 
-genome_sf <- genome_clean %>% 
+genome_app <- genome_clean %>% 
   inner_join(play_basin_merge, by = "Basin") %>% 
   st_as_sf() %>% 
   #convert to points
   st_centroid()
 ```
 
-Save output dataframes to read into app
+
+Create variables for map symbology
 
 ```{r}
-st_write(sample_sf, "data/sample_app.shp", append = FALSE)
+# calculate # wells/basin and #samples/well
+sample_app <- sample_sf %>%
+  st_drop_geometry() %>%
+  # replace all N/A
+  mutate(across(where(is.character), ~ na_if(., "N/A")),
+         # make days_since_frack numeric
+         days_since_frack = as.numeric(days_since_frack)) %>%
+  group_by(well_ID) %>%
+  mutate(
+    n_samples = n(),
+    max_days_since_frack = max(days_since_frack, na.rm = TRUE)
+  ) %>%
+  distinct(well_ID, .keep_all = TRUE) %>%
+  group_by(Basin) %>%
+  mutate(n_wells = n()) %>%
+  select(Basin, well_ID, n_wells, n_samples, max_days_since_frack) %>%
+  right_join(sample_sf, by = c("Basin", "well_ID")) %>% 
+  ungroup() %>% 
+  st_as_sf()
 
-st_write(genome_sf, "data/genome_app.shp", append = FALSE)
+
 ```
+
+
+Save output spatial dfs to read into app
+
+```{r}
+save(sample_app, genome_app, file = "data/app_data.RData")
+
+# st_write(sample_summary, "data/sample_app.shp", append = FALSE)
+# st_write(genome_sf, "data/genome_app.shp", append = FALSE)
+```
+
+

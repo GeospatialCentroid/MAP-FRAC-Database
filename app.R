@@ -9,6 +9,7 @@ library(sf)
 library(plotly)
 library(leaflet)
 library(DT)
+library(tidyverse)
 
 
 # read in data
@@ -17,7 +18,9 @@ load("data/app_data.RData")
 sample_app <- st_jitter(sample_app, factor = 0.005)
 genome_app <- st_jitter(genome_app, factor = 0.005)
 
-basins <- read_sf("data/ShalePlays_US_EIA_Dec2021.shp")
+basins <- read_sf("data/ShalePlays_US_EIA_Dec2021.shp") %>% 
+  # fix typo
+  mutate(Lithology = if_else(Lithology == "MIxed Shale & Chalk", "Mixed Shale & Chalk", Lithology))
 
 # create summarized sample file for map
 sample_sum <- sample_app %>% 
@@ -56,8 +59,8 @@ ui <- fluidPage(
                       sidebar = sidebar(
                         position = "right",
                         checkboxGroupButtons("select_lith", "Filter by Lithology:",
-                                    choices = unique(sample$Lithlgy),
-                                    selected = unique(sample$Lithlgy),
+                                    choices = unique(sample_app$Lithology),
+                                    selected = unique(sample_app$Lithology),
                                     individual = TRUE
                                     ),
                         selectizeInput("zoom_basin", "Zoom to Basin:",
@@ -112,17 +115,24 @@ ui <- fluidPage(
 # Define server -----------------
 server <- function(input, output) {
 
+  ## reactive sample data -----------
+  basin_filtered <- reactive({
+    basins %>% 
+      filter(Lithology %in% input$select_lith)
+  })
+  
   ## sample plotly (test) ----
   output$timeseries <- plotly::renderPlotly({
     plot_ly(height = 250)
   })
+  
 
   ## sample map ----
   output$sample_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
       addPolygons(
-        data = basins,
+        data = basin_filtered(),
         stroke = FALSE,
         fillOpacity = 0.5,
         fillColor = "#91B187"

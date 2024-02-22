@@ -64,7 +64,7 @@ ui <- fluidPage(
                                     individual = TRUE
                                     ),
                         selectizeInput("zoom_basin", "Zoom to Basin:",
-                        choices = unique(sample$basin),
+                        choices = unique(sample_app$basin),
                         options = list(
                           placeholder = 'Please select an option below',
                           onInitialize = I('function() { this.setValue(""); }')
@@ -131,18 +131,24 @@ server <- function(input, output) {
   output$sample_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
+      addMapPane("basins", zIndex = 410) %>%
+      addMapPane("wells", zIndex = 420) %>%
       addPolygons(
-        data = basin_filtered(),
+        data = basins,
+        group = "basins",
         stroke = FALSE,
         fillOpacity = 0.5,
-        fillColor = "#91B187"
+        fillColor = "#91B187",
+        options = pathOptions(pane = "basins")
       ) %>%
       addCircleMarkers(
         data = sample_sum,
+        group = "wells",
         radius = ~ sqrt(n_samples) * 5,
         stroke = FALSE,
         fillOpacity = 0.5,
         fillColor = "#F7AD19",
+        options = pathOptions(pane = "wells"),
         popup = paste(
           "Well:",
           sample_sum$well_ID,
@@ -155,7 +161,20 @@ server <- function(input, output) {
         )
       )
   })
-
+  
+  ## filter basin ----
+  observeEvent(input$select_lith, {
+    leafletProxy('sample_map') %>%
+      clearGroup("basins") %>%
+      addPolygons(
+        data = basin_filtered(),
+        group = "basins",
+        stroke = FALSE,
+        fillOpacity = 0.5,
+        fillColor = "#91B187"
+      )
+  })
+  
   
   ### zoom to basin ------
   observeEvent(input$zoom_basin, {
@@ -165,7 +184,7 @@ server <- function(input, output) {
     } else {
     
     zoom <- reactive({
-      sample %>%
+      sample_sum %>%
         filter(basin == input$zoom_basin) %>%
         st_bbox() %>%
         st_as_sfc(crs = st_crs(sample)) %>%
@@ -187,7 +206,7 @@ server <- function(input, output) {
     module = selectizeGroupServer,
     id = "taxonomy_filter",
     inline = FALSE,
-    data = st_drop_geometry(genome),
+    data = st_drop_geometry(genome_app),
     vars = c("domain", "phylum", "class", "order", "family", "genus", "species")
   )
   output$genome_table <- DT::renderDataTable(taxa_mod())
@@ -198,7 +217,7 @@ server <- function(input, output) {
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
       addPolygons(data = basins, stroke = FALSE, fillOpacity = 0.7, fillColor = "#91B187") %>%
-      addCircleMarkers(data = genome,
+      addCircleMarkers(data = genome_app,
                        radius = 6,
                        stroke = FALSE,
                        fillOpacity = 0.5,

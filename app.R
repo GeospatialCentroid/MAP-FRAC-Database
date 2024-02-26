@@ -8,6 +8,7 @@ library(bslib)
 library(sf)
 library(plotly)
 library(leaflet)
+library(leaflegend)
 library(DT)
 library(tidyverse)
 
@@ -15,14 +16,11 @@ library(tidyverse)
 # read in data
 load("data/app_data.RData")
 
+# jitter well locations for sample map
 sample_app <- st_jitter(sample_app, factor = 0.005)
-genome_app <- st_jitter(genome_app, factor = 0.005)
 
-basins <- read_sf("data/ShalePlays_US_EIA_Dec2021.shp") %>% 
-  # fix typo
-  mutate(Lithology = if_else(Lithology == "MIxed Shale & Chalk", "Mixed Shale & Chalk", Lithology))
 
-# create summarized sample file for map
+# create summarized sample file for map (temporary)
 sample_sum <- sample_app %>% 
   distinct(well_ID, .keep_all = TRUE)
 
@@ -59,8 +57,8 @@ ui <- fluidPage(
                       sidebar = sidebar(
                         position = "right",
                         checkboxGroupButtons("select_lith", "Filter by Lithology:",
-                                    choices = unique(sample_app$Lithology),
-                                    selected = unique(sample_app$Lithology),
+                                    choices = unique(basin_sample$Lithology),
+                                    selected = unique(basin_sample$Lithology),
                                     individual = TRUE
                                     ),
                         selectizeInput("zoom_basin", "Zoom to Basin:",
@@ -73,8 +71,9 @@ ui <- fluidPage(
                       )
                     )
                    ),
-               card(height = 350,
-                   card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
+               card(#height = 420,
+                   #card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
+                 card_header(em("De-select basin names from the legend on the right to zoom to certain wells")),
                    plotlyOutput("timeseries")))
       
     ),
@@ -117,13 +116,29 @@ server <- function(input, output) {
 
   ## reactive sample data -----------
   basin_filtered <- reactive({
-    basins %>% 
+    basin_sample %>% 
       filter(Lithology %in% input$select_lith)
   })
   
   ## sample plotly (test) ----
   output$timeseries <- plotly::renderPlotly({
-    plot_ly(height = 250)
+    sample_app %>% 
+      plotly::plot_ly(height = 500, 
+                      colors = "Dark2") %>% 
+      add_trace(x = sample_app$days_since_frack,
+                y = sample_app$well_ID,
+                split = ~sample_app$well_ID,
+                color = ~sample_app$Basin,
+                name = ~sample_app$Basin,
+                legendgroup = ~sample_app$Basin,
+                type = 'scatter',
+                mode = 'lines+markers',
+                connectgaps = TRUE) %>% 
+      layout(showlegend = TRUE,
+             xaxis = list(title = "Days Since Frack")) %>% 
+      # hacky way to get one trace per group in legend
+      style(showlegend = FALSE, traces = c(1:4, 6:10, 12:14, 16, 18, 20:21, 23:24))
+ 
   })
   
 
@@ -131,24 +146,25 @@ server <- function(input, output) {
   output$sample_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
-      addMapPane("basins", zIndex = 410) %>%
-      addMapPane("wells", zIndex = 420) %>%
+      addMapPane("Basins", zIndex = 410) %>%
+      addMapPane("Wells", zIndex = 420) %>%
       addPolygons(
-        data = basins,
-        group = "basins",
+        data = basin_sample,
+        group = "Basins",
         stroke = FALSE,
         fillOpacity = 0.5,
         fillColor = "#91B187",
-        options = pathOptions(pane = "basins")
+        options = pathOptions(pane = "Basins")
+        
       ) %>%
       addCircleMarkers(
         data = sample_sum,
-        group = "wells",
-        radius = ~ sqrt(n_samples) * 5,
+        group = "Wells",
+        radius = ~ sqrt(n_samples)*3,
         stroke = FALSE,
         fillOpacity = 0.5,
         fillColor = "#F7AD19",
-        options = pathOptions(pane = "wells"),
+        options = pathOptions(pane = "Wells"),
         popup = paste(
           "Well:",
           sample_sum$well_ID,
@@ -159,19 +175,42 @@ server <- function(input, output) {
           "<br>",
           paste("Max days since frack:", sample_sum$max_days_since_frack)
         )
+      ) %>% 
+      addLegendSize(
+        values = sample_sum$n_samples,
+        color = '#F7AD19',
+        fillColor = '#F7AD19',
+       # opacity = 0.5,
+        title = "Number of Samples",
+        shape = "circle",
+        breaks = 5,
+        baseSize = 10,
+        orientation = "horizontal",
+        position = "bottomleft") %>% 
+      addLayersControl(position = "bottomleft",
+                       overlayGroups = c("Basins", "Wells"),
+                       options = layersControlOptions(collapsed = FALSE)
       )
   })
   
   ## filter basin ----
   observeEvent(input$select_lith, {
     leafletProxy('sample_map') %>%
-      clearGroup("basins") %>%
+      clearGroup("Basins") %>%
       addPolygons(
         data = basin_filtered(),
-        group = "basins",
+        group = "Basins",
         stroke = FALSE,
         fillOpacity = 0.5,
-        fillColor = "#91B187"
+        fillColor = "#91B187",
+        popup = paste(
+          "Basin:",
+          basin_filtered()$Basin,
+          "<br>",
+          paste("Lithology:", basin_filtered()$Lithology),
+          "<br>",
+          paste("Shale Play:", basin_filtered()$Shale_play)
+        )
       )
   })
   
@@ -187,7 +226,7 @@ server <- function(input, output) {
       sample_sum %>%
         filter(basin == input$zoom_basin) %>%
         st_bbox() %>%
-        st_as_sfc(crs = st_crs(sample)) %>%
+        st_as_sfc(crs = st_crs(sample_app)) %>%
         st_centroid() %>%
         st_coordinates()
 
@@ -212,16 +251,36 @@ server <- function(input, output) {
   output$genome_table <- DT::renderDataTable(taxa_mod())
   
   
+  
+  
   ## genome map -----
+  
+  
+  # color palette 
+  # If you want to set your own colors manually:
+  pal <- colorNumeric(
+    palette = c('#2cb2ba', '#94b674', '#fbb92d'),
+    domain = basin_genome$n_MAG_samples
+  )
+  
+  
   output$genome_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
-      addPolygons(data = basins, stroke = FALSE, fillOpacity = 0.7, fillColor = "#91B187") %>%
-      addCircleMarkers(data = genome_app,
-                       radius = 6,
-                       stroke = FALSE,
-                       fillOpacity = 0.5,
-                       fillColor = "#F7AD19")
+      addPolygons(
+        data = basin_genome,
+        stroke = FALSE,
+        fillOpacity = 1,
+        fillColor = ~pal(n_MAG_samples),
+        popup = paste(
+          "Basin:",
+          basin_genome$Basin,
+          "<br>",
+          paste("Number of MAG samples:", basin_genome$n_MAG_samples)
+        )
+      ) %>% 
+      addLegend("bottomright", data = basin_genome, values = ~n_MAG_samples,
+                pal = pal, title = "Number of <br/> MAG samples")
   })
   
 

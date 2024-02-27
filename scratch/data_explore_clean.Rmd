@@ -1,0 +1,223 @@
+---
+title: "Explore and clean input data"
+author: "Caitlin Mothes"
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(sf)
+library(mapview)
+```
+
+Read in (test) datasets:
+
+```{r}
+sample <- read_xlsx("data/SAMPLE_geospatial_metadata.xlsx")
+
+genome <- read_xlsx("data/GENOME_geospatial_metadata.xlsx")
+
+# Downloaded from here: https://www.eia.gov/maps/maps.php
+play_basin <- read_sf("data/ShalePlays_US_EIA_Dec2021.shp")
+
+sediment_basin <- read_sf("data/SedimentaryBasins_US_May2011_v2.shp")
+```
+
+Quick map of basins
+
+```{r}
+mapview(play_basin) +
+  mapview(sediment_basin, color = "red")
+```
+
+Looks like sediment basins are just larger areas around play basins.
+
+Check that all basins in sample datasets are in the basin shapefile
+
+```{r}
+sample %>% 
+  filter(!basin %in% play_basin$Basin)
+
+play_basin %>% 
+  pull(Basin) %>% 
+  unique()
+
+sample %>% 
+  pull(basin) %>% 
+  unique()
+
+genome %>% 
+  pull(basin) %>% 
+  unique()
+
+# not an exact name match..also some basins in sample data not in shapefile
+# no Bowland Shale, Sichuan, Western Canadian -> these are international
+```
+
+Some basins have separate polygons for formations, will need to join by matching sample formations
+
+For the ones that do match, clean up basin names so we can join:
+
+```{r}
+sample_clean <- sample %>%
+  # remove "Basin" from name and change Denver site name to match
+  mutate(Basin = str_remove_all(basin, "Basin") %>% 
+           str_replace("Denver-Julesburg", "Denver") %>% 
+           # trailing spaces were causing errors in join
+            str_remove_all(" "),
+         # capitalize formation names to match shapefile
+         Shale_play = str_to_title(formation) %>% 
+           # also change the formation wording for Anadarko sites
+           str_replace(fixed("Stack (Woodford)"), "Woodford"))
+
+genome_clean <- genome %>% 
+  # remove "Basin" from name and change Denver site name to match
+  mutate(Basin = str_remove_all(basin, "Basin") %>% 
+           str_replace("DJ", "Denver") %>% 
+           # trailing spaces were causing errors in join
+            str_remove_all(" ")) %>% 
+  mutate(across(domain:species, ~str_remove(.x, ".*__")))
+
+```
+
+Now join both dataframes to shapefile (missing basin names will be dropped for now).
+
+First create basin layer for app:
+
+```{r}
+
+basin_sample <- play_basin %>%
+  # trailing spaces causing errors in join
+  mutate(
+    Basin = str_remove_all(Basin, " ") %>%
+      str_remove_all(., "Basin"),
+    # fix typo
+    Lithology = if_else(Lithology == "MIxed Shale & Chalk", "Mixed Shale & Chalk", Lithology)
+  ) %>%
+  # join to sample
+  inner_join(sample_clean, by = c("Basin", "Shale_play")) %>%
+  distinct(Basin, Shale_play, well_ID, Lithology, .keep_all = TRUE) %>%
+  group_by(Basin) %>%
+  mutate(n_wells = n()) %>%
+  select(Basin, Lithology, Shale_play, n_wells) %>%
+  # merge multipolygons to single one for basin/shale play
+  group_by(Basin, Shale_play, Lithology, n_wells) %>%
+  summarise(geometry = st_union(geometry)) %>%
+  ungroup() %>%
+  st_make_valid()
+
+## not all basins are Shale
+
+# make basin layer for genome map
+
+basin_genome <- play_basin %>%
+  # trailing spaces causing errors in join
+  mutate(
+    Basin = str_remove_all(Basin, " ") %>%
+      str_remove_all(., "Basin"),
+    # fix typo
+    Lithology = if_else(Lithology == "MIxed Shale & Chalk", "Mixed Shale & Chalk", Lithology)
+  ) %>%
+   st_make_valid() %>% 
+  group_by(Basin) %>% 
+  summarise(geometry = st_union(geometry)) %>% 
+  ungroup() %>% 
+  st_make_valid() %>% 
+  # join to sample
+  inner_join(genome_clean, by = "Basin") %>%
+  group_by(Basin) %>% 
+  summarise(n_MAG_samples = n())
+  
+
+
+
+
+```
+
+Create sample layer for app:
+
+```{r}
+sample_sf <- sample_clean %>%
+  inner_join(basin_sample, by = c("Basin", "Shale_play")) %>%
+  st_as_sf() %>%
+  # convert to points
+  st_centroid() %>%
+  # edit lithology typo
+  mutate(
+    Lithology = if_else(Lithology == "MIxed Shale & Chalk", "Mixed Shale & Chalk", Lithology),
+    days_since_frack = na_if(days_since_frack, "N/A") %>%
+       # make days_since_frack numeric
+       as.numeric(.)
+  )
+
+# create variables for map symbology
+sample_app <- sample_sf %>%
+  st_drop_geometry() %>%
+  group_by(well_ID) %>%
+  mutate(
+    n_samples = n(),
+    max_days_since_frack = max(days_since_frack, na.rm = TRUE)
+  ) %>%
+  distinct(well_ID, .keep_all = TRUE) %>%
+  select(Basin, well_ID, n_samples, max_days_since_frack) %>%
+  right_join(sample_sf, by = c("Basin", "well_ID")) %>%
+  ungroup() %>%
+  st_as_sf()
+
+```
+
+Create genome map data:
+
+```{r}
+# need to merge polygons per basin for genome data since no sub formation info
+# play_basin_merge <- basin_app %>% 
+#   st_make_valid() %>% 
+#   group_by(Basin) %>% 
+#   summarise(geometry = st_union(geometry)) %>% 
+#   ungroup() %>% 
+#   st_make_valid()
+
+genome_app <- genome_clean #%>% 
+  # inner_join(basin_genome, by = "Basin") %>% 
+  # select(-Basin) %>% 
+  # st_as_sf() %>% 
+  # #convert to points
+  # st_centroid()
+```
+
+Save output spatial dfs to read into app
+
+```{r}
+save(sample_app, genome_app, basin_sample, basin_genome, file = "data/app_data.RData")
+
+# st_write(sample_summary, "data/sample_app.shp", append = FALSE)
+# st_write(genome_sf, "data/genome_app.shp", append = FALSE)
+```
+
+Make time series plot
+
+```{r}
+sample_app %>% 
+    mutate(Basin = factor(Basin, levels = c("WesternGulf", "Permian", "Appalachian", 
+                                            "Anadarko", "Dener", "PowderRiver", "Michigan")),
+           well_ID = fct_reorder(well_ID, max_days_since_frack)) %>%
+ # arrange(Basin, well_ID, days_since_frack) %>% 
+
+plotly::plot_ly(colors = "Dark2") %>% 
+  add_trace(x = sample_app$days_since_frack,
+            y = sample_app$well_ID,
+            split = ~sample_app$well_ID,
+            color = ~sample_app$Basin,
+            name = ~sample_app$Basin,
+            legendgroup = ~sample_app$Basin,
+            type = 'scatter',
+            mode = 'lines+markers',
+            connectgaps = TRUE) %>% 
+  layout(showlegend = TRUE, yaxis = list(type = "category",
+  categoryorder = "array", categoryarray = sort(unique(sample_app$Basin)))) %>% 
+         
+  #categoryarray = sort(unique(sample_app$Basin))) %>% 
+  # hacky way to get one trace per group in legend
+  style(showlegend = FALSE, traces = c(1:4, 6:10, 12:14, 16, 18, 20:21, 23:24))
+  
+```

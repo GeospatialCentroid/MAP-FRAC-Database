@@ -13,14 +13,16 @@ library(mapview)
 Read in (test) datasets:
 
 ```{r}
-sample <- read_xlsx("data/SAMPLE_geospatial_metadata.xlsx")
+sample <- read_xlsx("data/SAMPLE_geospatial_metadata_3.7.24.xlsx") %>% 
+  janitor::clean_names()
 
 genome <- read_xlsx("data/GENOME_geospatial_metadata.xlsx")
 
 # Downloaded from here: https://www.eia.gov/maps/maps.php
-play_basin <- read_sf("data/ShalePlays_US_EIA_Dec2021.shp")
+play_basin <- read_sf("data/TightOil_ShaleGas_Plays_Lower48_EIA.shp")
 
-sediment_basin <- read_sf("data/SedimentaryBasins_US_May2011_v2.shp")
+sediment_basin <- read_sf("data/SedimentaryBasins_US_EIA.shp") %>% 
+  mutate(NAME = str_to_title(NAME))
 ```
 
 Quick map of basins
@@ -87,24 +89,29 @@ First create basin layer for app:
 ```{r}
 
 basin_sample <- play_basin %>%
-  # trailing spaces causing errors in join
-  mutate(
-    Basin = str_remove_all(Basin, " ") %>%
-      str_remove_all(., "Basin"),
-    # fix typo
-    Lithology = if_else(Lithology == "MIxed Shale & Chalk", "Mixed Shale & Chalk", Lithology)
-  ) %>%
-  # join to sample
-  inner_join(sample_clean, by = c("Basin", "Shale_play")) %>%
-  distinct(Basin, Shale_play, well_ID, Lithology, .keep_all = TRUE) %>%
-  group_by(Basin) %>%
-  mutate(n_wells = n()) %>%
-  select(Basin, Lithology, Shale_play, n_wells) %>%
-  # merge multipolygons to single one for basin/shale play
-  group_by(Basin, Shale_play, Lithology, n_wells) %>%
-  summarise(geometry = st_union(geometry)) %>%
-  ungroup() %>%
+  group_by(Shale_play) %>% 
+  summarise(st_union(geometry)) %>% 
+  ungroup() %>% 
   st_make_valid()
+  # trailing spaces causing errors in join
+ # mutate(Shale_play = str_remove_all(Shale_play, " "))
+  # mutate(
+  #   Basin = str_remove_all(Basin, " ") %>%
+  #     str_remove_all(., "Basin"),
+  #   # fix typo
+  #   Lithology = if_else(Lithology == "MIxed Shale & Chalk", "Mixed Shale & Chalk", Lithology)
+  # ) %>%
+  # # join to sample
+  # inner_join(sample_clean, by = c("Basin", "Shale_play")) %>%
+  # distinct(Basin, Shale_play, well_ID, Lithology, .keep_all = TRUE) %>%
+  # group_by(Basin) %>%
+  # mutate(n_wells = n()) %>%
+  # select(Basin, Lithology, Shale_play, n_wells) %>%
+  # # merge multipolygons to single one for basin/shale play
+  # group_by(Basin, Shale_play, Lithology, n_wells) %>%
+  # summarise(geometry = st_union(geometry)) %>%
+  # ungroup() %>%
+  # st_make_valid()
 
 ## not all basins are Shale
 
@@ -137,30 +144,31 @@ basin_genome <- play_basin %>%
 Create sample layer for app:
 
 ```{r}
-sample_sf <- sample_clean %>%
-  inner_join(basin_sample, by = c("Basin", "Shale_play")) %>%
+sample_sf <- sample %>%
+  left_join(basin_sample, by = c("shale_play" = "Shale_play")) %>%
   st_as_sf() %>%
   # convert to points
   st_centroid() %>%
   # edit lithology typo
-  mutate(
-    Lithology = if_else(Lithology == "MIxed Shale & Chalk", "Mixed Shale & Chalk", Lithology),
-    days_since_frack = na_if(days_since_frack, "N/A") %>%
-       # make days_since_frack numeric
-       as.numeric(.)
-  )
+   mutate(
+  #   Lithology = if_else(Lithology == "MIxed Shale & Chalk", "Mixed Shale & Chalk", Lithology),
+     days_since_frack = na_if(days_since_frack, "N/A|unk") %>%
+        # make days_since_frack numeric
+        as.numeric(.)
+   )
 
 # create variables for map symbology
 sample_app <- sample_sf %>%
   st_drop_geometry() %>%
-  group_by(well_ID) %>%
+  group_by(well_id) %>%
   mutate(
     n_samples = n(),
-    max_days_since_frack = max(days_since_frack, na.rm = TRUE)
+    max_days_since_frack = max(days_since_frack, na.rm = TRUE),
+    min_days_since_frack = min(days_since_frack, na.rm = TRUE)
   ) %>%
-  distinct(well_ID, .keep_all = TRUE) %>%
-  select(Basin, well_ID, n_samples, max_days_since_frack) %>%
-  right_join(sample_sf, by = c("Basin", "well_ID")) %>%
+  distinct(well_id, .keep_all = TRUE) %>%
+  select(shale_play, well_id, n_samples, min_days_since_frack, max_days_since_frack) %>%
+  right_join(sample_sf, by = c("shale_play", "well_id")) %>%
   ungroup() %>%
   st_as_sf()
 
@@ -188,7 +196,11 @@ genome_app <- genome_clean #%>%
 Save output spatial dfs to read into app
 
 ```{r}
-save(sample_app, genome_app, basin_sample, basin_genome, file = "data/app_data.RData")
+#save just new sample df and new play shapefile (rename)
+play_sample <- basin_sample
+save(play_sample, file = "data/play_sample.RData")
+save(sample_app, file = "data/sample_app.RData")
+#save(sample_app, genome_app, basin_sample, basin_genome, file = "data/app_data.RData")
 
 # st_write(sample_summary, "data/sample_app.shp", append = FALSE)
 # st_write(genome_sf, "data/genome_app.shp", append = FALSE)
@@ -198,26 +210,26 @@ Make time series plot
 
 ```{r}
 sample_app %>% 
-    mutate(Basin = factor(Basin, levels = c("WesternGulf", "Permian", "Appalachian", 
-                                            "Anadarko", "Dener", "PowderRiver", "Michigan")),
-           well_ID = fct_reorder(well_ID, max_days_since_frack)) %>%
+ # filter(days)
+    # mutate(Basin = factor(Basin, levels = c("WesternGulf", "Permian", "Appalachian", 
+    #                                         "Anadarko", "Dener", "PowderRiver", "Michigan")),
+    #        well_ID = fct_reorder(well_ID, max_days_since_frack)) %>%
  # arrange(Basin, well_ID, days_since_frack) %>% 
-
 plotly::plot_ly(colors = "Dark2") %>% 
   add_trace(x = sample_app$days_since_frack,
-            y = sample_app$well_ID,
-            split = ~sample_app$well_ID,
-            color = ~sample_app$Basin,
-            name = ~sample_app$Basin,
-            legendgroup = ~sample_app$Basin,
+            y = sample_app$well_id,
+            split = ~sample_app$well_id,
+            color = ~sample_app$shale_basin,
+            name = ~sample_app$shale_basin,
+            legendgroup = ~sample_app$shale_basin,
             type = 'scatter',
             mode = 'lines+markers',
             connectgaps = TRUE) %>% 
   layout(showlegend = TRUE, yaxis = list(type = "category",
-  categoryorder = "array", categoryarray = sort(unique(sample_app$Basin)))) %>% 
+  categoryorder = "array", categoryarray = sort(unique(sample_app$shale_basin)))) %>% 
          
   #categoryarray = sort(unique(sample_app$Basin))) %>% 
   # hacky way to get one trace per group in legend
-  style(showlegend = FALSE, traces = c(1:4, 6:10, 12:14, 16, 18, 20:21, 23:24))
+  style(showlegend = FALSE, traces = c(1:4, 7:11, 13:16, 17, 21, 22:24, 26, 28))
   
 ```

@@ -15,6 +15,11 @@ library(tidyverse)
 
 # read in data
 load("data/app_data.RData")
+load("data/sample_app.RData")
+load("data/play_sample.RData")
+
+sediment_basin <- read_sf("data/SedimentaryBasins_US_EIA.shp") %>% 
+  mutate(NAME = str_to_title(NAME))
 
 # jitter well locations for sample map
 sample_app <- st_jitter(sample_app, factor = 0.005)
@@ -22,7 +27,7 @@ sample_app <- st_jitter(sample_app, factor = 0.005)
 
 # create summarized sample file for map (temporary)
 sample_sum <- sample_app %>% 
-  distinct(well_ID, .keep_all = TRUE)
+  distinct(well_id, .keep_all = TRUE)
 
 # Define UI -----------------
 ui <- fluidPage(
@@ -56,13 +61,13 @@ ui <- fluidPage(
                       open = TRUE,
                       sidebar = sidebar(
                         position = "right",
-                        checkboxGroupButtons("select_lith", "Filter by Lithology:",
-                                    choices = unique(basin_sample$Lithology),
-                                    selected = unique(basin_sample$Lithology),
-                                    individual = TRUE
-                                    ),
+                        # checkboxGroupButtons("select_lith", "Filter by Lithology:",
+                        #             choices = unique(basin_sample$Lithology),
+                        #             selected = unique(basin_sample$Lithology),
+                        #             individual = TRUE
+                        #             ),
                         selectizeInput("zoom_basin", "Zoom to Basin:",
-                        choices = unique(sample_app$basin),
+                        choices = unique(sample_app$shale_basin),
                         options = list(
                           placeholder = 'Please select an option below',
                           onInitialize = I('function() { this.setValue(""); }')
@@ -115,10 +120,10 @@ ui <- fluidPage(
 server <- function(input, output) {
 
   ## reactive sample data -----------
-  basin_filtered <- reactive({
-    basin_sample %>% 
-      filter(Lithology %in% input$select_lith)
-  })
+  # basin_filtered <- reactive({
+  #   basin_sample %>% 
+  #     filter(Lithology %in% input$select_lith)
+  # })
   
   ## sample plotly (test) ----
   output$timeseries <- plotly::renderPlotly({
@@ -126,11 +131,11 @@ server <- function(input, output) {
       plotly::plot_ly(height = 500, 
                       colors = "Dark2") %>% 
       add_trace(x = sample_app$days_since_frack,
-                y = sample_app$well_ID,
-                split = ~sample_app$well_ID,
-                color = ~sample_app$Basin,
-                name = ~sample_app$Basin,
-                legendgroup = ~sample_app$Basin,
+                y = sample_app$well_id,
+                split = ~sample_app$well_id,
+                color = ~sample_app$shale_basin,
+                name = ~sample_app$shale_basin,
+                legendgroup = ~sample_app$shale_basin,
                 type = 'scatter',
                 mode = 'lines+markers',
                 connectgaps = TRUE) %>% 
@@ -147,9 +152,10 @@ server <- function(input, output) {
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
       addMapPane("Basins", zIndex = 410) %>%
-      addMapPane("Wells", zIndex = 420) %>%
+      addMapPane("Plays", zIndex = 420) %>% 
+      addMapPane("Wells", zIndex = 430) %>%
       addPolygons(
-        data = basin_sample,
+        data = sediment_basin,
         group = "Basins",
         stroke = FALSE,
         fillOpacity = 0.5,
@@ -157,6 +163,14 @@ server <- function(input, output) {
         options = pathOptions(pane = "Basins")
         
       ) %>%
+      addPolygons(
+        data = play_sample,
+        group = "Plays",
+        stroke = FALSE,
+        fillOpacity = 0.5,
+        fillColor = "blue",
+        options = pathOptions(pane = "Plays")
+      ) %>% 
       addCircleMarkers(
         data = sample_sum,
         group = "Wells",
@@ -167,13 +181,15 @@ server <- function(input, output) {
         options = pathOptions(pane = "Wells"),
         popup = paste(
           "Well:",
-          sample_sum$well_ID,
+          sample_sum$well_id,
           "<br>",
-          paste("Basin:", sample_sum$Basin),
+          paste("Basin:", sample_sum$shale_basin),
+          "<br>",
+          paste("Play:", sample_sum$shale_play),
           "<br>",
           paste("Number of Samples:", sample_sum$n_samples),
           "<br>",
-          paste("Max days since frack:", sample_sum$max_days_since_frack)
+          paste("Range days since frack:", paste(sample_sum$min_days_since_frack, ":", sample_sum$max_days_since_frack))
         )
       ) %>% 
       addLegendSize(
@@ -194,25 +210,25 @@ server <- function(input, output) {
   })
   
   ## filter basin ----
-  observeEvent(input$select_lith, {
-    leafletProxy('sample_map') %>%
-      clearGroup("Basins") %>%
-      addPolygons(
-        data = basin_filtered(),
-        group = "Basins",
-        stroke = FALSE,
-        fillOpacity = 0.5,
-        fillColor = "#91B187",
-        popup = paste(
-          "Basin:",
-          basin_filtered()$Basin,
-          "<br>",
-          paste("Lithology:", basin_filtered()$Lithology),
-          "<br>",
-          paste("Shale Play:", basin_filtered()$Shale_play)
-        )
-      )
-  })
+  # observeEvent(input$select_lith, {
+  #   leafletProxy('sample_map') %>%
+  #     clearGroup("Basins") %>%
+  #     addPolygons(
+  #       data = basin_filtered(),
+  #       group = "Basins",
+  #       stroke = FALSE,
+  #       fillOpacity = 0.5,
+  #       fillColor = "#91B187",
+  #       popup = paste(
+  #         "Basin:",
+  #         basin_filtered()$Basin,
+  #         "<br>",
+  #         paste("Lithology:", basin_filtered()$Lithology),
+  #         "<br>",
+  #         paste("Shale Play:", basin_filtered()$Shale_play)
+  #       )
+  #     )
+  # })
   
   
   ### zoom to basin ------
@@ -224,7 +240,7 @@ server <- function(input, output) {
     
     zoom <- reactive({
       sample_sum %>%
-        filter(basin == input$zoom_basin) %>%
+        filter(shale_basin == input$zoom_basin) %>%
         st_bbox() %>%
         st_as_sfc(crs = st_crs(sample_app)) %>%
         st_centroid() %>%

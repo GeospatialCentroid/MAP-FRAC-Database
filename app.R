@@ -40,7 +40,7 @@ ui <- fluidPage(
     primary = "#7198ab",
     secondary = "#F27F0c",
     #success = "#a5c90f",
-    base_font = font_google("Inria Sans")
+    #base_font = font_google("Inria Sans")
   ),
   includeCSS("www/style.css"),
   
@@ -142,7 +142,7 @@ server <- function(input, output) {
       layout(showlegend = TRUE,
              xaxis = list(title = "Days Since Frack")) %>% 
       # hacky way to get one trace per group in legend
-      style(showlegend = FALSE, traces = c(1:4, 6:10, 12:14, 16, 18, 20:21, 23:24))
+      style(showlegend = FALSE, traces = c(1:4, 7:11, 13:16, 17, 21, 22:24, 26, 28))
  
   })
   

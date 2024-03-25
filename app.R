@@ -15,19 +15,18 @@ library(tidyverse)
 
 # read in data
 load("data/app_data.RData")
-load("data/sample_app.RData")
-load("data/play_sample.RData")
+load("data/app_data_Update.RData")
 
-sediment_basin <- read_sf("data/SedimentaryBasins_US_EIA.shp") %>% 
-  mutate(NAME = str_to_title(NAME))
 
 # jitter well locations for sample map
-sample_app <- st_jitter(sample_app, factor = 0.005)
+sample_app <- st_jitter(sample_app, factor = 0.005) %>% 
+  st_transform(crs = 4326)
 
-
-# create summarized sample file for map (temporary)
-sample_sum <- sample_app %>% 
-  distinct(well_id, .keep_all = TRUE)
+# for now, create string of basin names that does not include international ones
+basin_names <- sample_app %>% 
+  filter(!shale_basin %in% c("Bowland Shale", "Sichuan", "Western Canadian")) %>% 
+  pull(shale_basin) %>% 
+  unique()
 
 # Define UI -----------------
 ui <- fluidPage(
@@ -61,17 +60,18 @@ ui <- fluidPage(
                       open = TRUE,
                       sidebar = sidebar(
                         position = "right",
-                        # checkboxGroupButtons("select_lith", "Filter by Lithology:",
-                        #             choices = unique(basin_sample$Lithology),
-                        #             selected = unique(basin_sample$Lithology),
-                        #             individual = TRUE
-                        #             ),
                         selectizeInput("zoom_basin", "Zoom to Basin:",
-                        choices = unique(sample_app$shale_basin),
+                        choices = basin_names,
                         options = list(
                           placeholder = 'Please select an option below',
                           onInitialize = I('function() { this.setValue(""); }')
-                        ))),
+                        )),
+                        checkboxGroupButtons("time_series", "Filter by Time Series:",
+                                    choiceNames = c("Early (0-100 days)", "Mid (100-365 days", "Late (>365 Days)", "No Time Series"),
+                                    choiceValues = c("early", "mid", "late", "none"),
+                                    selected = c("early", "mid", "late", "none"),
+                                    individual = TRUE
+                                    )),
                         leafletOutput("sample_map")
                       )
                     )
@@ -120,30 +120,52 @@ ui <- fluidPage(
 server <- function(input, output) {
 
   ## reactive sample data -----------
-  # basin_filtered <- reactive({
-  #   basin_sample %>% 
-  #     filter(Lithology %in% input$select_lith)
-  # })
+  sample_filtered <- reactive({
+    sample_app %>%
+      filter(timeseries_stage %in% input$time_series) %>% 
+      # count # samples per well
+      group_by(well_id) %>% 
+      mutate(n_samples = n()) %>% 
+      distinct(well_id, .keep_all = TRUE) %>% 
+      ungroup()
+      
+  })
   
-  ## sample plotly (test) ----
+  ## time series plotly ----
   output$timeseries <- plotly::renderPlotly({
-    sample_app %>% 
-      plotly::plot_ly(height = 500, 
-                      colors = "Dark2") %>% 
-      add_trace(x = sample_app$days_since_frack,
-                y = sample_app$well_id,
-                split = ~sample_app$well_id,
-                color = ~sample_app$shale_basin,
-                name = ~sample_app$shale_basin,
-                legendgroup = ~sample_app$shale_basin,
-                type = 'scatter',
-                mode = 'lines+markers',
-                connectgaps = TRUE) %>% 
-      layout(showlegend = TRUE,
-             xaxis = list(title = "Days Since Frack")) %>% 
-      # hacky way to get one trace per group in legend
-      style(showlegend = FALSE, traces = c(1:4, 7:11, 13:16, 17, 21, 22:24, 26, 28))
- 
+    sample_app %>%
+      arrange(shale_basin) %>%
+      plotly::plot_ly(height = 700) %>% 
+                      add_trace(
+                        x = sample_app$days_since_frack,
+                        y = sample_app$well_id,
+                        split = ~ sample_app$well_id,
+                        color = ~ factor(sample_app$shale_basin),
+                        colors = c(
+                          "#72266C",
+                          "#0A81A7",
+                          "#94305A",
+                          '#F15F26',
+                          "#D58D4E",
+                          "#47B862",
+                          "#FDBB3D",
+                          "#269380",
+                          "#60BFD9",
+                          "#D51D5C",
+                          "#B796C6"
+                        ),
+                        name = ~ sample_app$shale_basin,
+                        legendgroup = ~ sample_app$shale_basin,
+                        type = 'scatter',
+                        mode = 'lines+markers',
+                        connectgaps = TRUE
+                      ) %>%
+                        layout(showlegend = TRUE,
+                               xaxis = list(title = "Days Since Frack")) %>%
+                        # hacky way to get one trace per group in legend
+                        style(showlegend = FALSE,
+                              traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28))
+                      
   })
   
 
@@ -160,40 +182,48 @@ server <- function(input, output) {
         stroke = FALSE,
         fillOpacity = 0.5,
         fillColor = "#91B187",
-        options = pathOptions(pane = "Basins")
+        options = pathOptions(pane = "Basins"),
+        popup = paste(
+          "Basin:",
+          sediment_basin$NAME)
         
       ) %>%
       addPolygons(
-        data = play_sample,
+        data = play_basin_filtered,
         group = "Plays",
         stroke = FALSE,
         fillOpacity = 0.5,
         fillColor = "blue",
-        options = pathOptions(pane = "Plays")
+        options = pathOptions(pane = "Plays"),
+        popup = paste(
+          "Play:",
+          play_basin_filtered$shale_play)
       ) %>% 
       addCircleMarkers(
-        data = sample_sum,
+        data = sample_filtered(),
         group = "Wells",
         radius = ~ sqrt(n_samples)*3,
-        stroke = FALSE,
+        stroke = TRUE,
+        weight = 1,
+        color = "black",
         fillOpacity = 0.5,
         fillColor = "#F7AD19",
         options = pathOptions(pane = "Wells"),
         popup = paste(
           "Well:",
-          sample_sum$well_id,
+          sample_filtered()$well_id,
           "<br>",
-          paste("Basin:", sample_sum$shale_basin),
+          paste("Basin:", sample_filtered()$shale_basin),
           "<br>",
-          paste("Play:", sample_sum$shale_play),
+          paste("Play:", sample_filtered()$shale_play),
           "<br>",
-          paste("Number of Samples:", sample_sum$n_samples),
+          paste("Number of Samples:", sample_filtered()$n_samples),
           "<br>",
-          paste("Range days since frack:", paste(sample_sum$min_days_since_frack, ":", sample_sum$max_days_since_frack))
+          paste("Range days since frack:", paste0(sample_filtered()$min_days_since_frack, "-", sample_filtered()$max_days_since_frack))
         )
       ) %>% 
       addLegendSize(
-        values = sample_sum$n_samples,
+        values = sample_filtered()$n_samples,
         color = '#F7AD19',
         fillColor = '#F7AD19',
        # opacity = 0.5,
@@ -204,7 +234,7 @@ server <- function(input, output) {
         orientation = "horizontal",
         position = "bottomleft") %>% 
       addLayersControl(position = "bottomleft",
-                       overlayGroups = c("Basins", "Wells"),
+                       overlayGroups = c("Basins", "Plays", "Wells"),
                        options = layersControlOptions(collapsed = FALSE)
       )
   })
@@ -239,7 +269,7 @@ server <- function(input, output) {
     } else {
     
     zoom <- reactive({
-      sample_sum %>%
+      sample_app %>%
         filter(shale_basin == input$zoom_basin) %>%
         st_bbox() %>%
         st_as_sfc(crs = st_crs(sample_app)) %>%

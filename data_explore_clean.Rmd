@@ -32,6 +32,20 @@ sediment_basin <- read_sf("data/SedimentaryBasins_US_EIA.shp") %>%
 
 ```
 
+
+Read in international basins
+```{r}
+bowland <- read_sf("data/BGS_DECC_Bowland_study/topBHU_limit.shp") %>% 
+  mutate(shale_play = "uk", shale_basin = "Bowland Shale") %>% 
+  st_transform(4326)
+mapview(bowland)
+
+
+west_canada <- read_sf("data/wcsb_shapefiles/WCSBAtlasShp/fg0301_py_ll.shp")
+mapview(west_canada)
+```
+
+
 Quick map of basins
 
 ```{r}

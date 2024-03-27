@@ -227,7 +227,7 @@ Save output spatial dfs to read into app
 
 ```{r}
 #save updated data
-save(sample_app, play_basin_filtered, sediment_basin, file = "data/app_data_Update.RData")
+save(sample_app, play_basin, sediment_basin, file = "data/app_data_Update.RData")
 
 
 #save(sample_app, genome_app, basin_sample, basin_genome, file = "data/app_data.RData")

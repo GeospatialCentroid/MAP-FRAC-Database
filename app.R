@@ -17,6 +17,24 @@ library(tidyverse)
 load("data/app_data.RData")
 load("data/app_data_Update.RData")
 
+# create color palettes
+pal_basin <- colorFactor(
+  palette = c("#72266C", "#0A81A7", rep("grey", 5), "#F15F26", rep("grey", 3),
+              "#D58D4E", rep("grey", 3), "#47B862", rep("grey", 4), "#FDBB3D",
+               "#269380", rep("grey", 8),  "#B796C6", "grey"),
+  domain = sediment_basin$NAME
+)
+
+pal_play <- colorFactor(
+  palette = c("#72266C", "#0A81A7", rep("grey", 5), "#F15F26", rep("grey", 3),
+              "#D58D4E", "grey", "#47B862", rep("grey", 5), "#FDBB3D", "grey",
+              "#269380", rep("grey", 9),  "#B796C6", "grey"),
+  domain = play_basin$Basin
+)
+
+
+
+
 
 # jitter well locations for sample map
 # sample_app <- st_jitter(sample_app, factor = 0.005) %>% 
@@ -123,29 +141,28 @@ server <- function(input, output) {
   ## reactive sample data -----------
   sample_filtered <- reactive({
     sample_app %>%
-      filter(timeseries_stage %in% input$time_series) %>% 
+      filter(timeseries_stage %in% input$time_series) %>%
       # count # samples per well
-      group_by(well_id) %>% 
-      mutate(n_samples = n()) %>% 
-      distinct(well_id, .keep_all = TRUE) %>% 
+      group_by(well_id) %>%
+      mutate(n_samples = n()) %>%
+      distinct(well_id, .keep_all = TRUE) %>%
       ungroup()
-      
+    
+  })
+  ## jitter points for 2 zoom levels
+  
+  sample_jitter1 <- reactive({
+    # if(nrow(sample_filtered()>0)) {
+    st_jitter(sample_filtered(), factor = 0.015) %>%
+      st_transform(crs = 4326)
+    # }
   })
   
-  ## jitter points for 2 zoom levels
-
-    sample_jitter1 <- reactive({
-      # if(nrow(sample_filtered()>0)) {
-      st_jitter(sample_filtered(), factor = 0.015) %>%
-        st_transform(crs = 4326)
-      # }
-    })
-    
-    sample_jitter2 <- reactive({
-      st_jitter(sample_filtered(), factor = 0.005) %>%
-        st_transform(crs = 4326)
-    })
-
+  sample_jitter2 <- reactive({
+    st_jitter(sample_filtered(), factor = 0.005) %>%
+      st_transform(crs = 4326)
+  })
+  
   
   
   ## time series plotly ----
@@ -239,8 +256,9 @@ server <- function(input, output) {
         data = sediment_basin,
         group = "Basins",
         stroke = FALSE,
-        fillOpacity = 0.5,
-        fillColor = "#91B187",
+        fillOpacity = 0.4,
+        fillColor = ~pal_basin(NAME),
+        #fillColor = "#91B187",
         options = pathOptions(pane = "Basins"),
         popup = paste(
           "Basin:",
@@ -248,15 +266,34 @@ server <- function(input, output) {
         
       ) %>%
       addPolygons(
-        data = play_basin_filtered,
+        data = filter(play_basin, Shale_play %in% sample_app$shale_play),
         group = "Plays",
-        stroke = FALSE,
-        fillOpacity = 0.5,
-        fillColor = "blue",
+        stroke = TRUE,
+        weight = 0.5,
+        color = "lightgrey",
+        fillOpacity = 0.75,
+        fillColor = ~pal_play(Basin),
         options = pathOptions(pane = "Plays"),
         popup = paste(
           "Play:",
-          play_basin_filtered$shale_play)
+          play_basin[play_basin$Shale_play %in% sample_app$shale_play,]$Shale_play)
+      ) %>% 
+      addScaleBar(position = "bottomright") %>% 
+      addLayersControl(position = "bottomleft",
+                       overlayGroups = c("Basins", "Plays"),
+                       options = layersControlOptions(collapsed = FALSE)
+      ) %>% 
+      # add plays not sampled
+      addPolygons(
+        data = filter(play_basin, !Shale_play %in% sample_app$shale_play),
+        group = "Plays",
+        stroke = FALSE,
+        fillOpacity = 0.65,
+        fillColor = "grey",
+        options = pathOptions(pane = "Basins"),
+        popup = paste(
+          "Play:",
+          play_basin[!play_basin$Shale_play %in% sample_app$shale_play,]$Shale_play)
       ) %>% 
       addScaleBar(position = "bottomright") %>% 
       addLayersControl(position = "bottomleft",
@@ -285,7 +322,8 @@ server <- function(input, output) {
         weight = 1,
         color = "black",
         fillOpacity = 0.75,
-        fillColor = "#F7AD19",
+        fillColor = "#f7f257",
+        #fillColor = "#F7AD19",
         options = pathOptions(pane = "Wells"),
         popup = paste(
           "Well:",
@@ -308,7 +346,7 @@ server <- function(input, output) {
         weight = 1,
         color = "black",
         fillOpacity = 0.75,
-        fillColor = "#F7AD19",
+        fillColor = "#f7f257",
         options = pathOptions(pane = "Wells"),
         popup = paste(
           "Well:",
@@ -327,8 +365,8 @@ server <- function(input, output) {
       groupOptions("jitter2", zoomLevels = 7:20) %>% 
         addLegendSize(
           values = sample_filtered()$n_samples,
-          color = '#F7AD19',
-          fillColor = '#F7AD19',
+          color = '#f7f257',
+          fillColor = '#f7f257',
          # opacity = 0.5,
           title = HTML("Number of</br> Well Samples"),
           shape = "circle",

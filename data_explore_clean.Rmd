@@ -236,10 +236,11 @@ save(sample_app, play_basin_filtered, sediment_basin, file = "data/app_data_Upda
 # st_write(genome_sf, "data/genome_app.shp", append = FALSE)
 ```
 
-Make time series plot
+Make time series plot with axis break
 
 ```{r}
-sample_app %>% 
+
+fig_1 <- sample_app %>% 
  # filter(days)
     # mutate(Basin = factor(Basin, levels = c("WesternGulf", "Permian", "Appalachian", 
     #                                         "Anadarko", "Dener", "PowderRiver", "Michigan")),
@@ -261,5 +262,32 @@ plotly::plot_ly(colors = "Dark2") %>%
   #categoryarray = sort(unique(sample_app$Basin))) %>% 
   # hacky way to get one trace per group in legend
   style(showlegend = FALSE, traces = c(1:4, 7:11, 13:16, 17, 21, 22:24, 26, 28))
+
+fig_2 <-  sample_app %>% 
+ # filter(days)
+    # mutate(Basin = factor(Basin, levels = c("WesternGulf", "Permian", "Appalachian", 
+    #                                         "Anadarko", "Dener", "PowderRiver", "Michigan")),
+    #        well_ID = fct_reorder(well_ID, max_days_since_frack)) %>%
+ # arrange(Basin, well_ID, days_since_frack) %>% 
+plotly::plot_ly(colors = "Dark2") %>% 
+  add_trace(x = sample_app$days_since_frack,
+            y = sample_app$well_id,
+            split = ~sample_app$well_id,
+            color = ~sample_app$shale_basin,
+            name = ~sample_app$shale_basin,
+            legendgroup = ~sample_app$shale_basin,
+            type = 'scatter',
+            mode = 'lines+markers',
+            connectgaps = TRUE) %>% 
+  layout(showlegend = TRUE, yaxis = list(type = "category",
+  categoryorder = "array", categoryarray = sort(unique(sample_app$shale_basin)))) %>% 
+         
+  #categoryarray = sort(unique(sample_app$Basin))) %>% 
+  # hacky way to get one trace per group in legend
+  style(showlegend = FALSE, traces = c(1:4, 7:11, 13:16, 17, 21, 22:24, 26, 28))
+
+subplot(fig_1, fig_2, nrows = 1, shareY = TRUE, margin = 0.02) %>% 
+  layout(xaxis = list(range = c(0, 2500)),
+         xaxis2 = list(range = c(4500, 5000)))
   
 ```

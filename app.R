@@ -19,12 +19,13 @@ load("data/app_data_Update.RData")
 
 
 # jitter well locations for sample map
-sample_app <- st_jitter(sample_app, factor = 0.005) %>% 
-  st_transform(crs = 4326)
+# sample_app <- st_jitter(sample_app, factor = 0.005) %>% 
+#   st_transform(crs = 4326)
 
 # for now, create string of basin names that does not include international ones
 basin_names <- sample_app %>% 
   filter(!shale_basin %in% c("Bowland Shale", "Sichuan", "Western Canadian")) %>% 
+  arrange(shale_basin) %>% 
   pull(shale_basin) %>% 
   unique()
 
@@ -76,9 +77,9 @@ ui <- fluidPage(
                       )
                     )
                    ),
-               card(#height = 420,
+               card(height = 750,
                    #card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
-                 card_header(em("De-select basin names from the legend on the right to zoom to certain wells")),
+                 #card_header(em("De-select basin names from the legend on the right to zoom to certain wells")),
                    plotlyOutput("timeseries")))
       
     ),
@@ -131,42 +132,100 @@ server <- function(input, output) {
       
   })
   
+  ## jitter points for 2 zoom levels
+
+    sample_jitter1 <- reactive({
+      # if(nrow(sample_filtered()>0)) {
+      st_jitter(sample_filtered(), factor = 0.015) %>%
+        st_transform(crs = 4326)
+      # }
+    })
+    
+    sample_jitter2 <- reactive({
+      st_jitter(sample_filtered(), factor = 0.005) %>%
+        st_transform(crs = 4326)
+    })
+
+  
+  
   ## time series plotly ----
-  output$timeseries <- plotly::renderPlotly({
-    sample_app %>%
-      arrange(shale_basin) %>%
-      plotly::plot_ly(height = 700) %>% 
-                      add_trace(
-                        x = sample_app$days_since_frack,
-                        y = sample_app$well_id,
-                        split = ~ sample_app$well_id,
-                        color = ~ factor(sample_app$shale_basin),
-                        colors = c(
-                          "#72266C",
-                          "#0A81A7",
-                          "#94305A",
-                          '#F15F26',
-                          "#D58D4E",
-                          "#47B862",
-                          "#FDBB3D",
-                          "#269380",
-                          "#60BFD9",
-                          "#D51D5C",
-                          "#B796C6"
-                        ),
-                        name = ~ sample_app$shale_basin,
-                        legendgroup = ~ sample_app$shale_basin,
-                        type = 'scatter',
-                        mode = 'lines+markers',
-                        connectgaps = TRUE
-                      ) %>%
-                        layout(showlegend = TRUE,
-                               xaxis = list(title = "Days Since Frack")) %>%
-                        # hacky way to get one trace per group in legend
-                        style(showlegend = FALSE,
-                              traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28))
-                      
-  })
+    output$timeseries <- plotly::renderPlotly({
+      fig_1 <- sample_app %>%
+        arrange(shale_basin) %>%
+        plotly::plot_ly(height = 700) %>%
+        add_trace(
+          x = sample_app$days_since_frack,
+          y = sample_app$well_id,
+          split = ~ sample_app$well_id,
+          color = ~ factor(sample_app$shale_basin),
+          colors = c(
+            "#72266C",
+            "#0A81A7",
+            "#94305A",
+            '#F15F26',
+            "#D58D4E",
+            "#47B862",
+            "#FDBB3D",
+            "#269380",
+            "#60BFD9",
+            "#D51D5C",
+            "#B796C6"
+          ),
+          name = ~ sample_app$shale_basin,
+          legendgroup = ~ sample_app$shale_basin,
+          type = 'scatter',
+          mode = 'lines+markers',
+          connectgaps = TRUE
+        ) %>%
+        layout(showlegend = TRUE,
+               xaxis = list(title = "Days Since Frack")) %>%
+        # hacky way to get one trace per group in legend
+        style(showlegend = FALSE,
+              traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28))
+      
+      fig_2 <- sample_app %>%
+        arrange(shale_basin) %>%
+        plotly::plot_ly(height = 700, showlegend = F) %>%
+        add_trace(
+          x = sample_app$days_since_frack,
+          y = sample_app$well_id,
+          split = ~ sample_app$well_id,
+          color = ~ factor(sample_app$shale_basin),
+          colors = c(
+            "#72266C",
+            "#0A81A7",
+            "#94305A",
+            '#F15F26',
+            "#D58D4E",
+            "#47B862",
+            "#FDBB3D",
+            "#269380",
+            "#60BFD9",
+            "#D51D5C",
+            "#B796C6"
+          ),
+          name = ~ sample_app$shale_basin,
+          #legendgroup = ~ sample_app$shale_basin,
+          type = 'scatter',
+          mode = 'lines+markers',
+          connectgaps = TRUE
+        ) #%>%
+        # layout(showlegend = TRUE,
+        #        xaxis = list(title = "Days Since Frack")) %>%
+        # style(showlegend = FALSE,
+        #       traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28))
+
+      subplot(fig_1,
+              fig_2,
+              nrows = 1,
+              shareY = TRUE,
+              shareX = TRUE,
+              margin = 0.025,
+              widths = c(0.8, 0.2)) %>%
+        layout(xaxis = list(range = c(0, 2500), title = "Days Since Frack"),
+               xaxis2 = list(range = c(4500, 5000)))
+      
+    })
   
 
   ## sample map ----
@@ -199,14 +258,33 @@ server <- function(input, output) {
           "Play:",
           play_basin_filtered$shale_play)
       ) %>% 
+      addScaleBar(position = "bottomright") %>% 
+      addLayersControl(position = "bottomleft",
+                       overlayGroups = c("Basins", "Plays"),
+                       options = layersControlOptions(collapsed = FALSE)
+      )
+  })
+  
+  # proxy for filtering points
+  observeEvent(sample_filtered(), {
+    
+    if(nrow(sample_filtered()) == 0) {
+      leafletProxy('sample_map') %>% 
+        clearMarkers() %>% 
+        clearControls()
+    } else {
+    
+    leafletProxy('sample_map') %>% 
+      clearMarkers() %>% 
+        clearControls() %>% 
       addCircleMarkers(
-        data = sample_filtered(),
+        data = sample_jitter1(),
         group = "Wells",
         radius = ~ sqrt(n_samples)*3,
         stroke = TRUE,
         weight = 1,
         color = "black",
-        fillOpacity = 0.5,
+        fillOpacity = 0.75,
         fillColor = "#F7AD19",
         options = pathOptions(pane = "Wells"),
         popup = paste(
@@ -219,24 +297,47 @@ server <- function(input, output) {
           "<br>",
           paste("Number of Samples:", sample_filtered()$n_samples),
           "<br>",
-          paste("Range days since frack:", paste0(sample_filtered()$min_days_since_frack, "-", sample_filtered()$max_days_since_frack))
+          paste("Range of days since frack:", paste0(sample_filtered()$min_days_since_frack, "-", sample_filtered()$max_days_since_frack))
         )
       ) %>% 
-      addLegendSize(
-        values = sample_filtered()$n_samples,
-        color = '#F7AD19',
-        fillColor = '#F7AD19',
-       # opacity = 0.5,
-        title = "Number of Samples",
-        shape = "circle",
-        breaks = 5,
-        baseSize = 10,
-        orientation = "horizontal",
-        position = "bottomleft") %>% 
-      addLayersControl(position = "bottomleft",
-                       overlayGroups = c("Basins", "Plays", "Wells"),
-                       options = layersControlOptions(collapsed = FALSE)
-      )
+      addCircleMarkers(
+        data = sample_jitter2(),
+        group = "jitter2",
+        radius = ~ sqrt(n_samples)*3,
+        stroke = TRUE,
+        weight = 1,
+        color = "black",
+        fillOpacity = 0.75,
+        fillColor = "#F7AD19",
+        options = pathOptions(pane = "Wells"),
+        popup = paste(
+          "Well:",
+          sample_filtered()$well_id,
+          "<br>",
+          paste("Basin:", sample_filtered()$shale_basin),
+          "<br>",
+          paste("Play:", sample_filtered()$shale_play),
+          "<br>",
+          paste("Number of Samples:", sample_filtered()$n_samples),
+          "<br>",
+          paste("Range of days since frack:", paste0(sample_filtered()$min_days_since_frack, "-", sample_filtered()$max_days_since_frack))
+        )
+      ) %>% 
+      groupOptions("Wells", zoomLevels = 1:6) %>% 
+      groupOptions("jitter2", zoomLevels = 7:20) %>% 
+        addLegendSize(
+          values = sample_filtered()$n_samples,
+          color = '#F7AD19',
+          fillColor = '#F7AD19',
+         # opacity = 0.5,
+          title = HTML("Number of</br> Well Samples"),
+          shape = "circle",
+          breaks = 5,
+          baseSize = 10,
+          orientation = "vertical",
+          position = "bottomright")
+    }
+    
   })
   
   ## filter basin ----
@@ -263,14 +364,14 @@ server <- function(input, output) {
   
   ### zoom to basin ------
   observeEvent(input$zoom_basin, {
-    
+
     if (input$zoom_basin == "") {
       leafletProxy("sample_map")
     } else {
-    
+
     zoom <- reactive({
-      sample_app %>%
-        filter(shale_basin == input$zoom_basin) %>%
+      sediment_basin %>%
+        filter(NAME == input$zoom_basin) %>%
         st_bbox() %>%
         st_as_sfc(crs = st_crs(sample_app)) %>%
         st_centroid() %>%
@@ -284,8 +385,7 @@ server <- function(input, output) {
 
 
   })
-  
-  
+
   ## select taxonomy
   taxa_mod <- callModule(
     module = selectizeGroupServer,

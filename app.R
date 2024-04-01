@@ -70,14 +70,20 @@ ui <- fluidPage(
     
     tabPanel(
       "Sample Explorer",
-      h4("Placeholder for subheader/description of project"),
+      h4(strong("The Microorganisms Affecting Production in FRACturing systems (MAP-FRAC)
+         database"), "is a metagenomic catalog of microbial functional potential across 
+         geologically-distinct shale basins."),
+      p(style = "color: #a3a2a2", "Explore the",strong("178"), "produced fluid samples from", strong("32"), "fracking wells across",
+        strong("8"), "shale basins underlying the United States."),
       
       fluidRow(
         column(12,
                card(full_screen = TRUE,
+                    height = 600,
                     layout_sidebar(
                       open = TRUE,
                       sidebar = sidebar(
+                        width = 275,
                         position = "right",
                         selectizeInput("zoom_basin", "Zoom to Basin:",
                         choices = basin_names,
@@ -175,6 +181,7 @@ server <- function(input, output) {
           y = sample_app$well_id,
           split = ~ sample_app$well_id,
           color = ~ factor(sample_app$shale_basin),
+          marker = list(size = 10),
           colors = c(
             "#72266C",
             "#0A81A7",
@@ -195,7 +202,12 @@ server <- function(input, output) {
           connectgaps = TRUE
         ) %>%
         layout(showlegend = TRUE,
-               xaxis = list(title = "Days Since Frack")) %>%
+               legend = list(title = list(text = 'Shale Basin')),
+               xaxis = list(title = "Days Since Frack", gridcolor = "gray"),
+               yaxis = list(title= "Fracking Well", gridcolor = "gray"),
+               plot_bgcolor = 'transparent',
+               paper_bgcolor = 'transparent',
+               font = list(color = 'white')) %>%
         # hacky way to get one trace per group in legend
         style(showlegend = FALSE,
               traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28))
@@ -208,6 +220,7 @@ server <- function(input, output) {
           y = sample_app$well_id,
           split = ~ sample_app$well_id,
           color = ~ factor(sample_app$shale_basin),
+          marker = list(size = 10),
           colors = c(
             "#72266C",
             "#0A81A7",
@@ -240,7 +253,7 @@ server <- function(input, output) {
               margin = 0.025,
               widths = c(0.8, 0.2)) %>%
         layout(xaxis = list(range = c(0, 2500), title = "Days Since Frack"),
-               xaxis2 = list(range = c(4500, 5000)))
+               xaxis2 = list(range = c(4500, 5000), gridcolor = "gray"))
       
     })
   
@@ -256,7 +269,7 @@ server <- function(input, output) {
         data = sediment_basin,
         group = "Basins",
         stroke = FALSE,
-        fillOpacity = 0.4,
+        fillOpacity = 0.65,
         fillColor = ~pal_basin(NAME),
         #fillColor = "#91B187",
         options = pathOptions(pane = "Basins"),
@@ -321,8 +334,8 @@ server <- function(input, output) {
         stroke = TRUE,
         weight = 1,
         color = "black",
-        fillOpacity = 0.75,
-        fillColor = "#f7f257",
+        fillOpacity = 0.85,
+        fillColor = "white",
         #fillColor = "#F7AD19",
         options = pathOptions(pane = "Wells"),
         popup = paste(
@@ -345,8 +358,8 @@ server <- function(input, output) {
         stroke = TRUE,
         weight = 1,
         color = "black",
-        fillOpacity = 0.75,
-        fillColor = "#f7f257",
+        fillOpacity = 0.85,
+        fillColor = "white",
         options = pathOptions(pane = "Wells"),
         popup = paste(
           "Well:",
@@ -365,8 +378,8 @@ server <- function(input, output) {
       groupOptions("jitter2", zoomLevels = 7:20) %>% 
         addLegendSize(
           values = sample_filtered()$n_samples,
-          color = '#f7f257',
-          fillColor = '#f7f257',
+          color = 'white',
+          fillColor = 'white',
          # opacity = 0.5,
           title = HTML("Number of</br> Well Samples"),
           shape = "circle",

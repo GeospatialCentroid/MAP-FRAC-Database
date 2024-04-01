@@ -91,12 +91,11 @@ ui <- fluidPage(
                           placeholder = 'Please select an option below',
                           onInitialize = I('function() { this.setValue(""); }')
                         )),
-                        checkboxGroupButtons("time_series", "Filter by Time Series:",
-                                    choiceNames = c("Early (0-100 days)", "Mid (100-365 days", "Late (>365 Days)", "No Time Series"),
-                                    choiceValues = c("early", "mid", "late", "none"),
-                                    selected = c("early", "mid", "late", "none"),
-                                    individual = TRUE
-                                    )),
+                        radioGroupButtons("time_series", "Wells with timeseries sampling:",
+                                    choices = c("Yes", "No")
+                                    #selected = character(0)
+                                    ),
+                        uiOutput("time_selection")),
                         leafletOutput("sample_map")
                       )
                     )
@@ -144,31 +143,69 @@ ui <- fluidPage(
 # Define server -----------------
 server <- function(input, output) {
 
+  # update UI based on time series selection
+  output$time_selection <- renderUI({
+    
+    #validate(need(!is.null(input$time_series), "Please select a time series option."))
+    
+    if(input$time_series == "Yes") {
+      checkboxGroupInput("time_category", "Time Series Stage:",
+                           choiceNames = c("Early (0-100 days)", "Mid (100-365 days", "Late (>365 Days)"),
+                           choiceValues = c("early", "mid", "late"),
+                           selected = c("early", "mid", "late")
+      )
+    } else {
+      p("")
+    }
+    
+  })
+  
+  
   ## reactive sample data -----------
-  sample_filtered <- reactive({
+  
+
+sample_filtered <- reactive({
+  if (input$time_series == "Yes") {
     sample_app %>%
-      filter(timeseries_stage %in% input$time_series) %>%
+      filter(timeseries_stage %in% input$time_category) %>%
       # count # samples per well
       group_by(well_id) %>%
       mutate(n_samples = n()) %>%
       distinct(well_id, .keep_all = TRUE) %>%
       ungroup()
+  } else {
+    sample_app %>%
+      filter(timeseries_stage == "none") %>%
+      # count # samples per well
+      group_by(well_id) %>%
+      mutate(n_samples = n()) %>%
+      distinct(well_id, .keep_all = TRUE) %>%
+      ungroup()
+  }
+  
+})
+
+    # update with time series selection
     
-  })
-  ## jitter points for 2 zoom levels
-  
-  sample_jitter1 <- reactive({
-    # if(nrow(sample_filtered()>0)) {
-    st_jitter(sample_filtered(), factor = 0.015) %>%
-      st_transform(crs = 4326)
-    # }
-  })
-  
-  sample_jitter2 <- reactive({
-    st_jitter(sample_filtered(), factor = 0.005) %>%
-      st_transform(crs = 4326)
-  })
-  
+    
+    ## jitter points for 2 zoom levels
+    
+    sample_jitter1 <- reactive({
+      # if(nrow(sample_filtered()>0)) {
+      st_jitter(sample_filtered(), factor = 0.015) %>%
+        st_transform(crs = 4326)
+      # }
+    })
+    
+    sample_jitter2 <- reactive({
+      st_jitter(sample_filtered(), factor = 0.005) %>%
+        st_transform(crs = 4326)
+    })
+    
+    
+
+
+
   
   
   ## time series plotly ----

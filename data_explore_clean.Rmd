@@ -13,7 +13,7 @@ library(mapview)
 Read in datasets:
 
 ```{r}
-sample <- read_xlsx("data/SAMPLE_geospatial_metadata_3.7.24.xlsx") %>% 
+sample <- read_xlsx("data/SAMPLE_geospatial_metadata_3.28.24.xlsx") %>% 
   janitor::clean_names()
 
 genome <- read_xlsx("data/GENOME_geospatial_metadata.xlsx")

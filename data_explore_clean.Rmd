@@ -178,10 +178,15 @@ sample_sf <- sample %>%
   mutate(
     # make days_since_frack numeric
     days_since_frack = na_if(days_since_frack, "N/A|unk") %>%
-      
       as.numeric(.),
     # edit time series stage for filtering
-    timeseries_stage = if_else(timeseries_stage == "N/A" | timeseries == "no", "none", timeseries_stage))
+    timeseries_stage = if_else(timeseries_stage == "N/A" | timeseries == "no", "none", timeseries_stage),
+    #edit salinity values for filtering
+    salinity_classification = if_else(salinity_classification == "N/A", NA_character_, salinity_classification),
+    salinity_conductivity_m_s_cm = if_else(salinity_conductivity_m_s_cm == "not measured", NA_character_, salinity_conductivity_m_s_cm) %>% 
+      as.numeric(.),
+    # edit 'N/A' values and make numeric
+    across(contains("perc"), ~if_else(. == "N/A", NA_character_, .) %>% as.numeric(.)))
 
 # create variables for map symbology
 sample_app <- sample_sf %>%
@@ -190,7 +195,10 @@ sample_app <- sample_sf %>%
   mutate(
    # n_samples = n(),
     max_days_since_frack = max(days_since_frack, na.rm = TRUE),
-    min_days_since_frack = min(days_since_frack, na.rm = TRUE)
+    min_days_since_frack = min(days_since_frack, na.rm = TRUE),
+    # change 'Inf' values to 0
+    max_days_since_frack = if_else(max_days_since_frack == -Inf, 0, max_days_since_frack),
+    min_days_since_frack = if_else(min_days_since_frack == Inf, 0, min_days_since_frack)
   ) %>%
   distinct(well_id, .keep_all = TRUE) %>%
   select(shale_play,
@@ -202,6 +210,12 @@ sample_app <- sample_sf %>%
   ungroup() %>%
   st_as_sf()
 
+# separate samples from inputs
+sample_inputs <- sample_app %>% 
+  filter(sample_type == "input")
+
+sample_app <- sample_app %>% 
+  filter(sample_type != "input")
 ```
 
 Create genome map data:
@@ -227,7 +241,7 @@ Save output spatial dfs to read into app
 
 ```{r}
 #save updated data
-save(sample_app, play_basin, sediment_basin, file = "data/app_data_Update.RData")
+save(sample_app, sample_inputs, play_basin, sediment_basin, file = "data/app_data_Update.RData")
 
 
 #save(sample_app, genome_app, basin_sample, basin_genome, file = "data/app_data.RData")

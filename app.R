@@ -32,7 +32,7 @@ pal_play <- colorFactor(
   domain = play_basin$Basin
 )
 
-
+pal_salinity <- colorNumeric(palette = "Reds", domain = sample_app$salinity_conductivity_m_s_cm)
 
 
 
@@ -83,7 +83,7 @@ ui <- fluidPage(
                     layout_sidebar(
                       open = TRUE,
                       sidebar = sidebar(
-                        width = 275,
+                        width = 300,
                         position = "right",
                         selectizeInput("zoom_basin", "Zoom to Basin:",
                         choices = basin_names,
@@ -91,12 +91,16 @@ ui <- fluidPage(
                           placeholder = 'Please select an option below',
                           onInitialize = I('function() { this.setValue(""); }')
                         )),
-                        radioGroupButtons("time_series", "Wells with timeseries sampling:",
-                                    choices = c("Yes", "No")
-                                    #selected = character(0)
-                                    ),
-                        uiOutput("time_selection")),
-                        leafletOutput("sample_map")
+                        radioGroupButtons("point_type", "View Points By:",
+                                          choices = c("Wells", "Samples"),
+                                          selected = "Wells"),
+                        uiOutput("update_panel")),
+                        # radioGroupButtons("time_series", "Wells with timeseries sampling:",
+                        #             choices = c("Yes", "No", "Show All Samples"),
+                        #             selected = "Show All Samples"
+                        #             ),
+                        # uiOutput("time_selection")),
+                        leafletOutput("sample_map", height = "100%")
                       )
                     )
                    ),
@@ -142,178 +146,224 @@ ui <- fluidPage(
 
 # Define server -----------------
 server <- function(input, output) {
-
-  # update UI based on time series selection
-  output$time_selection <- renderUI({
-    
-    #validate(need(!is.null(input$time_series), "Please select a time series option."))
-    
-    if(input$time_series == "Yes") {
-      checkboxGroupInput("time_category", "Time Series Stage:",
-                           choiceNames = c("Early (0-100 days)", "Mid (100-365 days", "Late (>365 Days)"),
-                           choiceValues = c("early", "mid", "late"),
-                           selected = c("early", "mid", "late")
+  
+  # update UI based on point type selection
+  output$update_panel <- renderUI({
+    if (input$point_type == "Wells") {
+      wellPanel(
+        radioGroupButtons(
+          "time_series",
+          "Wells with timeseries sampling:",
+          choices = c("Yes", "No", "Show All Samples"),
+          selected = "Show All Samples",
+          status = "primary"
+        ),
+        uiOutput("time_selection"),
+        
       )
+      
     } else {
-      p("")
+     "test"
     }
-    
   })
   
+  # # update UI based on time series selection
+  observeEvent(input$point_type, {
+    output$time_selection <- renderUI({
+      #validate(need(!is.null(input$time_series), "Please select a time series option."))
+
+      if (input$time_series == "Yes") {
+        checkboxGroupInput(
+          "time_category",
+          "Time Series Stage:",
+          choiceNames = c(
+            "Early (0-100 days)",
+            "Mid (100-365 days",
+            "Late (>365 Days)"
+          ),
+          choiceValues = c("early", "mid", "late"),
+          selected = c("early", "mid", "late")
+        )
+      } else {
+        p("")
+      }
+
+    })
+    
+    
+
+  })
+ 
+
   
   ## reactive sample data -----------
   
 
-sample_filtered <- reactive({
-  if (input$time_series == "Yes") {
-    sample_app %>%
-      filter(timeseries_stage %in% input$time_category) %>%
-      # count # samples per well
-      group_by(well_id) %>%
-      mutate(n_samples = n()) %>%
-      distinct(well_id, .keep_all = TRUE) %>%
-      ungroup()
-  } else {
-    sample_app %>%
-      filter(timeseries_stage == "none") %>%
-      # count # samples per well
-      group_by(well_id) %>%
-      mutate(n_samples = n()) %>%
-      distinct(well_id, .keep_all = TRUE) %>%
-      ungroup()
-  }
+   sample_filtered <- reactive({
+     if (input$time_series == "Show All Samples") {
+       sample_app %>%
+         # count # samples per well
+         group_by(well_id) %>%
+         mutate(n_samples = n()) %>%
+         distinct(well_id, .keep_all = TRUE) %>%
+         ungroup()
+     } else if (input$time_series == "Yes") {
+       sample_app %>%
+         filter(timeseries_stage %in% input$time_category) %>%
+         # count # samples per well
+         group_by(well_id) %>%
+         mutate(n_samples = n()) %>%
+         distinct(well_id, .keep_all = TRUE) %>%
+         ungroup()
+     } else {
+       sample_app %>%
+         filter(timeseries_stage == "none") %>%
+         # count # samples per well
+         group_by(well_id) %>%
+         mutate(n_samples = n()) %>%
+         distinct(well_id, .keep_all = TRUE) %>%
+         ungroup()
+     }
+
+   
+   
+   
+   ## jitter points for 2 zoom levels
+   
+   sample_jitter1 <- reactive({
+     # if(nrow(sample_filtered()>0)) {
+     st_jitter(sample_filtered(), factor = 0.015) %>%
+       st_transform(crs = 4326)
+     # }
+   })
+   
+   sample_jitter2 <- reactive({
+     st_jitter(sample_filtered(), factor = 0.005) %>%
+       st_transform(crs = 4326)
+   })
+ }) 
+ 
+
+
+
   
-})
-
-    # update with time series selection
-    
-    
-    ## jitter points for 2 zoom levels
-    
-    sample_jitter1 <- reactive({
-      # if(nrow(sample_filtered()>0)) {
-      st_jitter(sample_filtered(), factor = 0.015) %>%
-        st_transform(crs = 4326)
-      # }
-    })
-    
-    sample_jitter2 <- reactive({
-      st_jitter(sample_filtered(), factor = 0.005) %>%
-        st_transform(crs = 4326)
-    })
-    
-    
-
-
-
+  
   
   
   ## time series plotly ----
-    output$timeseries <- plotly::renderPlotly({
-      fig_1 <- sample_app %>%
-        arrange(shale_basin) %>%
-        plotly::plot_ly(height = 700) %>%
-        add_trace(
-          x = sample_app$days_since_frack,
-          y = sample_app$well_id,
-          split = ~ sample_app$well_id,
-          color = ~ factor(sample_app$shale_basin),
-          marker = list(size = 10),
-          colors = c(
-            "#72266C",
-            "#0A81A7",
-            "#94305A",
-            '#F15F26',
-            "#D58D4E",
-            "#47B862",
-            "#FDBB3D",
-            "#269380",
-            "#60BFD9",
-            "#D51D5C",
-            "#B796C6"
-          ),
-          name = ~ sample_app$shale_basin,
-          legendgroup = ~ sample_app$shale_basin,
-          type = 'scatter',
-          mode = 'lines+markers',
-          connectgaps = TRUE
-        ) %>%
-        layout(showlegend = TRUE,
-               legend = list(title = list(text = 'Shale Basin')),
-               xaxis = list(title = "Days Since Frack", gridcolor = "gray"),
-               yaxis = list(title= "Fracking Well", gridcolor = "gray"),
-               plot_bgcolor = 'transparent',
-               paper_bgcolor = 'transparent',
-               font = list(color = 'white')) %>%
-        # hacky way to get one trace per group in legend
-        style(showlegend = FALSE,
-              traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28))
-      
-      fig_2 <- sample_app %>%
-        arrange(shale_basin) %>%
-        plotly::plot_ly(height = 700, showlegend = F) %>%
-        add_trace(
-          x = sample_app$days_since_frack,
-          y = sample_app$well_id,
-          split = ~ sample_app$well_id,
-          color = ~ factor(sample_app$shale_basin),
-          marker = list(size = 10),
-          colors = c(
-            "#72266C",
-            "#0A81A7",
-            "#94305A",
-            '#F15F26',
-            "#D58D4E",
-            "#47B862",
-            "#FDBB3D",
-            "#269380",
-            "#60BFD9",
-            "#D51D5C",
-            "#B796C6"
-          ),
-          name = ~ sample_app$shale_basin,
-          #legendgroup = ~ sample_app$shale_basin,
-          type = 'scatter',
-          mode = 'lines+markers',
-          connectgaps = TRUE
-        ) #%>%
-        # layout(showlegend = TRUE,
-        #        xaxis = list(title = "Days Since Frack")) %>%
-        # style(showlegend = FALSE,
-        #       traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28))
-
-      subplot(fig_1,
-              fig_2,
-              nrows = 1,
-              shareY = TRUE,
-              shareX = TRUE,
-              margin = 0.025,
-              widths = c(0.8, 0.2)) %>%
-        layout(xaxis = list(range = c(0, 2500), title = "Days Since Frack"),
-               xaxis2 = list(range = c(4500, 5000), gridcolor = "gray"))
-      
-    })
+  output$timeseries <- plotly::renderPlotly({
+    fig_1 <- sample_app %>%
+      arrange(shale_basin) %>%
+      plotly::plot_ly(height = 700) %>%
+      add_trace(
+        x = sample_app$days_since_frack,
+        y = sample_app$well_id,
+        split = ~ sample_app$well_id,
+        color = ~ factor(sample_app$shale_basin),
+        marker = list(size = 10),
+        colors = c(
+          "#72266C",
+          "#0A81A7",
+          "#94305A",
+          '#F15F26',
+          "#D58D4E",
+          "#47B862",
+          "#FDBB3D",
+          "#269380",
+          "#60BFD9",
+          "#D51D5C",
+          "#B796C6"
+        ),
+        name = ~ sample_app$shale_basin,
+        legendgroup = ~ sample_app$shale_basin,
+        type = 'scatter',
+        mode = 'lines+markers',
+        connectgaps = TRUE
+      ) %>%
+      layout(
+        showlegend = TRUE,
+        legend = list(title = list(text = 'Shale Basin')),
+        xaxis = list(title = "Days Since Frack", gridcolor = "gray"),
+        yaxis = list(title = "Fracking Well", gridcolor = "gray"),
+        plot_bgcolor = 'transparent',
+        paper_bgcolor = 'transparent',
+        font = list(color = 'white')
+      ) %>%
+      # hacky way to get one trace per group in legend
+      style(
+        showlegend = FALSE,
+        traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28)
+      )
+    
+    fig_2 <- sample_app %>%
+      arrange(shale_basin) %>%
+      plotly::plot_ly(height = 700, showlegend = F) %>%
+      add_trace(
+        x = sample_app$days_since_frack,
+        y = sample_app$well_id,
+        split = ~ sample_app$well_id,
+        color = ~ factor(sample_app$shale_basin),
+        marker = list(size = 10),
+        colors = c(
+          "#72266C",
+          "#0A81A7",
+          "#94305A",
+          '#F15F26',
+          "#D58D4E",
+          "#47B862",
+          "#FDBB3D",
+          "#269380",
+          "#60BFD9",
+          "#D51D5C",
+          "#B796C6"
+        ),
+        name = ~ sample_app$shale_basin,
+        #legendgroup = ~ sample_app$shale_basin,
+        type = 'scatter',
+        mode = 'lines+markers',
+        connectgaps = TRUE
+      ) #%>%
+    # layout(showlegend = TRUE,
+    #        xaxis = list(title = "Days Since Frack")) %>%
+    # style(showlegend = FALSE,
+    #       traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28))
+    
+    subplot(
+      fig_1,
+      fig_2,
+      nrows = 1,
+      shareY = TRUE,
+      shareX = TRUE,
+      margin = 0.025,
+      widths = c(0.8, 0.2)
+    ) %>%
+      layout(
+        xaxis = list(range = c(0, 2500), title = "Days Since Frack"),
+        xaxis2 = list(range = c(4500, 5000), gridcolor = "gray")
+      )
+    
+  })
   
-
-  ## sample map ----
+  
+  # # sample map ----
   output$sample_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
       addMapPane("Basins", zIndex = 410) %>%
-      addMapPane("Plays", zIndex = 420) %>% 
-      addMapPane("Wells", zIndex = 430) %>%
+      addMapPane("Plays", zIndex = 420) %>%
+      addMapPane("Inputs", zIndex = 430) %>%
+      addMapPane("Wells", zIndex = 440) %>%
       addPolygons(
         data = sediment_basin,
         group = "Basins",
         stroke = FALSE,
         fillOpacity = 0.65,
-        fillColor = ~pal_basin(NAME),
+        fillColor = ~ pal_basin(NAME),
         #fillColor = "#91B187",
         options = pathOptions(pane = "Basins"),
-        popup = paste(
-          "Basin:",
-          sediment_basin$NAME)
-        
+        popup = paste("Basin:",
+                      sediment_basin$NAME)
+
       ) %>%
       addPolygons(
         data = filter(play_basin, Shale_play %in% sample_app$shale_play),
@@ -322,153 +372,160 @@ sample_filtered <- reactive({
         weight = 0.5,
         color = "lightgrey",
         fillOpacity = 0.75,
-        fillColor = ~pal_play(Basin),
+        fillColor = ~ pal_play(Basin),
         options = pathOptions(pane = "Plays"),
-        popup = paste(
-          "Play:",
-          play_basin[play_basin$Shale_play %in% sample_app$shale_play,]$Shale_play)
-      ) %>% 
-      addScaleBar(position = "bottomright") %>% 
-      addLayersControl(position = "bottomleft",
-                       overlayGroups = c("Basins", "Plays"),
-                       options = layersControlOptions(collapsed = FALSE)
-      ) %>% 
+        popup = paste("Play:",
+                      play_basin[play_basin$Shale_play %in% sample_app$shale_play, ]$Shale_play)
+      ) %>%
       # add plays not sampled
       addPolygons(
-        data = filter(play_basin, !Shale_play %in% sample_app$shale_play),
+        data = filter(play_basin,!Shale_play %in% sample_app$shale_play),
         group = "Plays",
         stroke = FALSE,
         fillOpacity = 0.65,
         fillColor = "grey",
         options = pathOptions(pane = "Basins"),
+        popup = paste("Play:",
+                      play_basin[!play_basin$Shale_play %in% sample_app$shale_play, ]$Shale_play)
+      ) %>%
+      # add input samples
+      addMarkers(
+        data = st_jitter(sample_inputs, 0.05),
+        group = "Inputs",
+        options = pathOptions(pane = "Inputs"),
+        icon = ~ makeIcon(iconUrl = "https://www.freeiconspng.com/uploads/triangle-shape-png-25.png",
+                 iconWidth = 18,
+                 iconHeight = 18),
         popup = paste(
-          "Play:",
-          play_basin[!play_basin$Shale_play %in% sample_app$shale_play,]$Shale_play)
-      ) %>% 
-      addScaleBar(position = "bottomright") %>% 
-      addLayersControl(position = "bottomleft",
-                       overlayGroups = c("Basins", "Plays"),
-                       options = layersControlOptions(collapsed = FALSE)
+          paste("Sample Type:", sample_inputs$sample_type),
+          "<br>",
+          paste("Input Type:",
+                paste0(sample_inputs$sample_subtype)),
+          "<br>",
+          "Well:",
+          sample_inputs$well_id,
+          "<br>",
+          paste("Basin:", sample_inputs$shale_basin),
+          "<br>",
+          paste("Play:", sample_inputs$shale_play))
+      ) %>%
+      addScaleBar(position = "bottomright") %>%
+      addLayersControl(
+        position = "bottomleft",
+        overlayGroups = c("Basins", "Plays", "Inputs"),
+        options = layersControlOptions(collapsed = FALSE)
       )
   })
-  
-  # proxy for filtering points
-  observeEvent(sample_filtered(), {
-    
-    if(nrow(sample_filtered()) == 0) {
-      leafletProxy('sample_map') %>% 
-        clearMarkers() %>% 
-        clearControls()
-    } else {
-    
-    leafletProxy('sample_map') %>% 
-      clearMarkers() %>% 
-        clearControls() %>% 
-      addCircleMarkers(
-        data = sample_jitter1(),
-        group = "Wells",
-        radius = ~ sqrt(n_samples)*3,
-        stroke = TRUE,
-        weight = 1,
-        color = "black",
-        fillOpacity = 0.85,
-        fillColor = "white",
-        #fillColor = "#F7AD19",
-        options = pathOptions(pane = "Wells"),
-        popup = paste(
-          "Well:",
-          sample_filtered()$well_id,
-          "<br>",
-          paste("Basin:", sample_filtered()$shale_basin),
-          "<br>",
-          paste("Play:", sample_filtered()$shale_play),
-          "<br>",
-          paste("Number of Samples:", sample_filtered()$n_samples),
-          "<br>",
-          paste("Range of days since frack:", paste0(sample_filtered()$min_days_since_frack, "-", sample_filtered()$max_days_since_frack))
-        )
-      ) %>% 
-      addCircleMarkers(
-        data = sample_jitter2(),
-        group = "jitter2",
-        radius = ~ sqrt(n_samples)*3,
-        stroke = TRUE,
-        weight = 1,
-        color = "black",
-        fillOpacity = 0.85,
-        fillColor = "white",
-        options = pathOptions(pane = "Wells"),
-        popup = paste(
-          "Well:",
-          sample_filtered()$well_id,
-          "<br>",
-          paste("Basin:", sample_filtered()$shale_basin),
-          "<br>",
-          paste("Play:", sample_filtered()$shale_play),
-          "<br>",
-          paste("Number of Samples:", sample_filtered()$n_samples),
-          "<br>",
-          paste("Range of days since frack:", paste0(sample_filtered()$min_days_since_frack, "-", sample_filtered()$max_days_since_frack))
-        )
-      ) %>% 
-      groupOptions("Wells", zoomLevels = 1:6) %>% 
-      groupOptions("jitter2", zoomLevels = 7:20) %>% 
-        addLegendSize(
-          values = sample_filtered()$n_samples,
-          color = 'white',
-          fillColor = 'white',
-         # opacity = 0.5,
-          title = HTML("Number of</br> Well Samples"),
-          shape = "circle",
-          breaks = 5,
-          baseSize = 10,
-          orientation = "vertical",
-          position = "bottomright")
-    }
-    
-  })
-  
-  ## filter basin ----
-  # observeEvent(input$select_lith, {
-  #   leafletProxy('sample_map') %>%
-  #     clearGroup("Basins") %>%
-  #     addPolygons(
-  #       data = basin_filtered(),
-  #       group = "Basins",
-  #       stroke = FALSE,
-  #       fillOpacity = 0.5,
-  #       fillColor = "#91B187",
-  #       popup = paste(
-  #         "Basin:",
-  #         basin_filtered()$Basin,
-  #         "<br>",
-  #         paste("Lithology:", basin_filtered()$Lithology),
-  #         "<br>",
-  #         paste("Shale Play:", basin_filtered()$Shale_play)
+  # 
+  # # proxy for filtering points
+ # observeEvent(sample_filtered(), {
+  #   if (nrow(sample_filtered()) == 0 | is.null(sample_filtered())) {
+  #     leafletProxy('sample_map') %>%
+  #       clearGroup("Wells") %>%
+  #       clearControls()
+  #   } else {
+  #     leafletProxy('sample_map') %>%
+  #       clearGroup("Wells") %>%
+  #       clearControls() %>%
+  #       addCircleMarkers(
+  #         data = sample_jitter1(),
+  #         group = "Wells",
+  #         radius = ~ sqrt(n_samples) * 3,
+  #         stroke = TRUE,
+  #         weight = 1,
+  #         color =  "black",
+  #         fillOpacity = 0.85,
+  #         fillColor = "white",
+  #         #fillColor = "#F7AD19",
+  #         options = pathOptions(pane = "Wells"),
+  #         popup = paste(
+  #           "Well:",
+  #           sample_filtered()$well_id,
+  #           "<br>",
+  #           paste("Basin:", sample_filtered()$shale_basin),
+  #           "<br>",
+  #           paste("Play:", sample_filtered()$shale_play),
+  #           "<br>",
+  #           paste("Number of Samples:", sample_filtered()$n_samples),
+  #           "<br>",
+  #           paste(
+  #             "Range of days since frack:",
+  #             paste0(
+  #               sample_filtered()$min_days_since_frack,
+  #               "-",
+  #               sample_filtered()$max_days_since_frack
+  #             )
+  #           )
+  #         )
+  #       ) %>%
+  #       addCircleMarkers(
+  #         data = sample_jitter2(),
+  #         group = "jitter2",
+  #         radius = ~ sqrt(n_samples) * 3,
+  #         stroke = TRUE,
+  #         weight = 1,
+  #         color = "black",
+  #         fillOpacity = 0.85,
+  #         fillColor = "white",
+  #         options = pathOptions(pane = "Wells"),
+  #         popup = paste(
+  #           "Well:",
+  #           sample_filtered()$well_id,
+  #           "<br>",
+  #           paste("Basin:", sample_filtered()$shale_basin),
+  #           "<br>",
+  #           paste("Play:", sample_filtered()$shale_play),
+  #           "<br>",
+  #           paste("Number of Samples:", sample_filtered()$n_samples),
+  #           "<br>",
+  #           paste(
+  #             "Range of days since frack:",
+  #             paste0(
+  #               sample_filtered()$min_days_since_frack,
+  #               "-",
+  #               sample_filtered()$max_days_since_frack
+  #             )
+  #           )
+  #         )
+  #       ) %>%
+  #       groupOptions("Wells", zoomLevels = 1:6) %>%
+  #       groupOptions("jitter2", zoomLevels = 7:20) %>%
+  #       addLegendSize(
+  #         values = sample_filtered()$n_samples,
+  #         color = 'white',
+  #         fillColor = 'white',
+  #         # opacity = 0.5,
+  #         title = HTML("Number of</br> Well Samples"),
+  #         shape = "circle",
+  #         breaks = 4,
+  #         baseSize = 8,
+  #         orientation = "vertical",
+  #         position = "bottomright"
   #       )
-  #     )
+  #   }
+  # 
   # })
-  
-  
-  ### zoom to basin ------
-  observeEvent(input$zoom_basin, {
 
+  
+  # ### zoom to basin ------
+  observeEvent(input$zoom_basin, {
     if (input$zoom_basin == "") {
       leafletProxy("sample_map")
     } else {
+      zoom <- reactive({
+        sediment_basin %>%
+          filter(NAME == input$zoom_basin) %>%
+          st_bbox() %>%
+          st_as_sfc(crs = st_crs(sample_app)) %>%
+          st_centroid() %>%
+          st_coordinates()
 
-    zoom <- reactive({
-      sediment_basin %>%
-        filter(NAME == input$zoom_basin) %>%
-        st_bbox() %>%
-        st_as_sfc(crs = st_crs(sample_app)) %>%
-        st_centroid() %>%
-        st_coordinates()
+      })
 
-    })
-
-    leafletProxy('sample_map') %>%
-      setView(lng = zoom()[1], lat = zoom()[2], zoom = 7)
+      leafletProxy('sample_map') %>%
+        setView(lng = zoom()[1],
+                lat = zoom()[2],
+                zoom = 7)
     }
 
 
@@ -480,7 +537,15 @@ sample_filtered <- reactive({
     id = "taxonomy_filter",
     inline = FALSE,
     data = st_drop_geometry(genome_app),
-    vars = c("domain", "phylum", "class", "order", "family", "genus", "species")
+    vars = c(
+      "domain",
+      "phylum",
+      "class",
+      "order",
+      "family",
+      "genus",
+      "species"
+    )
   )
   output$genome_table <- DT::renderDataTable(taxa_mod())
   
@@ -490,7 +555,7 @@ sample_filtered <- reactive({
   ## genome map -----
   
   
-  # color palette 
+  # color palette
   # If you want to set your own colors manually:
   pal <- colorNumeric(
     palette = c('#2cb2ba', '#94b674', '#fbb92d'),
@@ -505,20 +570,25 @@ sample_filtered <- reactive({
         data = basin_genome,
         stroke = FALSE,
         fillOpacity = 1,
-        fillColor = ~pal(n_MAG_samples),
+        fillColor = ~ pal(n_MAG_samples),
         popup = paste(
           "Basin:",
           basin_genome$Basin,
           "<br>",
           paste("Number of MAG samples:", basin_genome$n_MAG_samples)
         )
-      ) %>% 
-      addLegend("bottomright", data = basin_genome, values = ~n_MAG_samples,
-                pal = pal, title = "Number of <br/> MAG samples")
+      ) %>%
+      addLegend(
+        "bottomright",
+        data = basin_genome,
+        values = ~ n_MAG_samples,
+        pal = pal,
+        title = "Number of <br/> MAG samples"
+      )
   })
   
-
-
+  
+  
 }
 
 # Run the app ---------------------------

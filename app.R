@@ -166,24 +166,24 @@ server <- function(input, output, session) {
         p("Filter Samples:"),
         sliderInput("salinity_range","Salinity (Conductivity in mS/cm)",
                     min = min(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE),
-                    max = max(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE),
+                    max = round(max(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE)),
                     value = c(min(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE), 
-                              max(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE))),
+                              round(max(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE)))),
         sliderInput("sulfide_range","Percent Sulfide Producers",
                     min = min(sample_app$perc_sulfide_producers, na.rm = TRUE),
-                    max = max(sample_app$perc_sulfide_producers, na.rm = TRUE),
+                    max = round(max(sample_app$perc_sulfide_producers, na.rm = TRUE)),
                     value = c(min(sample_app$perc_sulfide_producers, na.rm = TRUE), 
-                              max(sample_app$perc_sulfide_producers, na.rm = TRUE))),
+                              round(max(sample_app$perc_sulfide_producers, na.rm = TRUE)))),
         sliderInput("acetate_range","Percent Acetate Producers",
                     min = min(sample_app$perc_acetate_producers, na.rm = TRUE),
-                    max = max(sample_app$perc_acetate_producers, na.rm = TRUE),
+                    max = round(max(sample_app$perc_acetate_producers, na.rm = TRUE)),
                     value = c(min(sample_app$perc_acetate_producers, na.rm = TRUE), 
-                              max(sample_app$perc_acetate_producers, na.rm = TRUE))),
+                              round(max(sample_app$perc_acetate_producers, na.rm = TRUE)))),
         sliderInput("methanogen_range","Percent Methanogens",
                     min = min(sample_app$perc_methanogens, na.rm = TRUE),
-                    max = max(sample_app$perc_methanogens, na.rm = TRUE),
+                    max = round(max(sample_app$perc_methanogens, na.rm = TRUE)),
                     value = c(min(sample_app$perc_methanogens, na.rm = TRUE), 
-                              max(sample_app$perc_methanogens, na.rm = TRUE)))
+                              round(max(sample_app$perc_methanogens, na.rm = TRUE))))
       )
     }
   })

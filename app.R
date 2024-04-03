@@ -11,6 +11,7 @@ library(leaflet)
 library(leaflegend)
 library(DT)
 library(tidyverse)
+library(data.table)
 
 
 # read in data
@@ -65,9 +66,6 @@ ui <- fluidPage(
   navbarPage(
     "MAP-FRAC Database",
     
-    # ## use shinydashboard ##
-    # header = tagList(useShinydashboard()),
-    
     tabPanel(
       "Sample Explorer",
       h4(strong("The Microorganisms Affecting Production in FRACturing systems (MAP-FRAC)
@@ -91,7 +89,7 @@ ui <- fluidPage(
                           placeholder = 'Please select an option below',
                           onInitialize = I('function() { this.setValue(""); }')
                         )),
-                        radioGroupButtons("point_type", "View Points By:",
+                        radioGroupButtons("point_type", "View points By:",
                                           choices = c("Wells", "Samples"),
                                           selected = "Wells"),
                         uiOutput("update_panel")),
@@ -145,7 +143,9 @@ ui <- fluidPage(
 )
 
 # Define server -----------------
-server <- function(input, output) {
+server <- function(input, output, session) {
+  
+
   
   # update UI based on point type selection
   output$update_panel <- renderUI({
@@ -154,24 +154,43 @@ server <- function(input, output) {
         radioGroupButtons(
           "time_series",
           "Wells with timeseries sampling:",
-          choices = c("Yes", "No", "Show All Samples"),
+          choices = c("Yes", 'No', "Show All Samples"),
           selected = "Show All Samples",
           status = "primary"
         ),
         uiOutput("time_selection"),
-        
+        uiOutput("salinity_selection")
       )
-      
     } else {
-     "test"
+      wellPanel(
+        p("Filter Samples:"),
+        sliderInput("salinity_range","Salinity (Conductivity in mS/cm)",
+                    min = min(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE),
+                    max = max(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE),
+                    value = c(min(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE), 
+                              max(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE))),
+        sliderInput("sulfide_range","Percent Sulfide Producers",
+                    min = min(sample_app$perc_sulfide_producers, na.rm = TRUE),
+                    max = max(sample_app$perc_sulfide_producers, na.rm = TRUE),
+                    value = c(min(sample_app$perc_sulfide_producers, na.rm = TRUE), 
+                              max(sample_app$perc_sulfide_producers, na.rm = TRUE))),
+        sliderInput("acetate_range","Percent Acetate Producers",
+                    min = min(sample_app$perc_acetate_producers, na.rm = TRUE),
+                    max = max(sample_app$perc_acetate_producers, na.rm = TRUE),
+                    value = c(min(sample_app$perc_acetate_producers, na.rm = TRUE), 
+                              max(sample_app$perc_acetate_producers, na.rm = TRUE))),
+        sliderInput("methanogen_range","Percent Methanogens",
+                    min = min(sample_app$perc_methanogens, na.rm = TRUE),
+                    max = max(sample_app$perc_methanogens, na.rm = TRUE),
+                    value = c(min(sample_app$perc_methanogens, na.rm = TRUE), 
+                              max(sample_app$perc_methanogens, na.rm = TRUE)))
+      )
     }
   })
   
-  # # update UI based on time series selection
-  observeEvent(input$point_type, {
+  # time selection
     output$time_selection <- renderUI({
       #validate(need(!is.null(input$time_series), "Please select a time series option."))
-
       if (input$time_series == "Yes") {
         checkboxGroupInput(
           "time_category",
@@ -188,45 +207,72 @@ server <- function(input, output) {
         p("")
       }
 
+   })
+    
+    output$salinity_selection <- renderUI({
+      checkboxGroupInput(
+        "salinity_class",
+        "Salinity Classification:",
+        choiceNames = c(
+          "Brine",
+          "High",
+          "Moderate",
+          "Not Measured"
+        ),
+        choiceValues = c("brine", "high", "moderate", "N/A"),
+        selected = c("brine", "high", "moderate", "N/A")
+      )
     })
     
     
-
-  })
- 
-
   
   ## reactive sample data -----------
   
-
    sample_filtered <- reactive({
-     if (input$time_series == "Show All Samples") {
-       sample_app %>%
-         # count # samples per well
-         group_by(well_id) %>%
-         mutate(n_samples = n()) %>%
-         distinct(well_id, .keep_all = TRUE) %>%
-         ungroup()
-     } else if (input$time_series == "Yes") {
-       sample_app %>%
-         filter(timeseries_stage %in% input$time_category) %>%
-         # count # samples per well
-         group_by(well_id) %>%
-         mutate(n_samples = n()) %>%
-         distinct(well_id, .keep_all = TRUE) %>%
-         ungroup()
+     if (input$point_type == "Wells") {
+       req(input$time_series)
+       if (input$time_series == "Show All Samples") {
+         sample_app %>%
+           filter(salinity_classification %in% input$salinity_class) %>% 
+           # count # samples per well
+           group_by(well_id) %>%
+           mutate(n_samples = n()) %>%
+           distinct(well_id, .keep_all = TRUE) %>%
+           ungroup()
+       } else if (input$time_series == "Yes") {
+         sample_app %>%
+           filter(timeseries_stage %in% input$time_category,
+                  salinity_classification %in% input$salinity_class) %>%
+           # count # samples per well
+           group_by(well_id) %>%
+           mutate(n_samples = n()) %>%
+           distinct(well_id, .keep_all = TRUE) %>%
+           ungroup()
+       } else {
+         sample_app %>%
+           filter(timeseries_stage == "none",
+                  salinity_classification %in% input$salinity_class) %>%
+           # count # samples per well
+           group_by(well_id) %>%
+           mutate(n_samples = n()) %>%
+           distinct(well_id, .keep_all = TRUE) %>%
+           ungroup()
+       }
+       
      } else {
-       sample_app %>%
-         filter(timeseries_stage == "none") %>%
-         # count # samples per well
-         group_by(well_id) %>%
-         mutate(n_samples = n()) %>%
-         distinct(well_id, .keep_all = TRUE) %>%
-         ungroup()
+       sample_app %>% 
+         filter(salinity_conductivity_m_s_cm %inrange% input$salinity_range,
+                perc_sulfide_producers %inrange% input$sulfide_range,
+                perc_acetate_producers %inrange% input$acetate_range,
+                perc_methanogens %inrange% input$methanogen_range)
      }
-
-   
-   
+    
+   })
+    
+  # observeEvent(input$salinity_range, {
+  #   print(input$salinity_range[1])
+  #   print(input$salinity_range[2])
+  # })
    
    ## jitter points for 2 zoom levels
    
@@ -241,13 +287,7 @@ server <- function(input, output) {
      st_jitter(sample_filtered(), factor = 0.005) %>%
        st_transform(crs = 4326)
    })
- }) 
  
-
-
-
-  
-  
   
   
   ## time series plotly ----
@@ -417,94 +457,133 @@ server <- function(input, output) {
       )
   })
   # 
-  # # proxy for filtering points
- # observeEvent(sample_filtered(), {
-  #   if (nrow(sample_filtered()) == 0 | is.null(sample_filtered())) {
-  #     leafletProxy('sample_map') %>%
-  #       clearGroup("Wells") %>%
-  #       clearControls()
-  #   } else {
-  #     leafletProxy('sample_map') %>%
-  #       clearGroup("Wells") %>%
-  #       clearControls() %>%
-  #       addCircleMarkers(
-  #         data = sample_jitter1(),
-  #         group = "Wells",
-  #         radius = ~ sqrt(n_samples) * 3,
-  #         stroke = TRUE,
-  #         weight = 1,
-  #         color =  "black",
-  #         fillOpacity = 0.85,
-  #         fillColor = "white",
-  #         #fillColor = "#F7AD19",
-  #         options = pathOptions(pane = "Wells"),
-  #         popup = paste(
-  #           "Well:",
-  #           sample_filtered()$well_id,
-  #           "<br>",
-  #           paste("Basin:", sample_filtered()$shale_basin),
-  #           "<br>",
-  #           paste("Play:", sample_filtered()$shale_play),
-  #           "<br>",
-  #           paste("Number of Samples:", sample_filtered()$n_samples),
-  #           "<br>",
-  #           paste(
-  #             "Range of days since frack:",
-  #             paste0(
-  #               sample_filtered()$min_days_since_frack,
-  #               "-",
-  #               sample_filtered()$max_days_since_frack
-  #             )
-  #           )
-  #         )
-  #       ) %>%
-  #       addCircleMarkers(
-  #         data = sample_jitter2(),
-  #         group = "jitter2",
-  #         radius = ~ sqrt(n_samples) * 3,
-  #         stroke = TRUE,
-  #         weight = 1,
-  #         color = "black",
-  #         fillOpacity = 0.85,
-  #         fillColor = "white",
-  #         options = pathOptions(pane = "Wells"),
-  #         popup = paste(
-  #           "Well:",
-  #           sample_filtered()$well_id,
-  #           "<br>",
-  #           paste("Basin:", sample_filtered()$shale_basin),
-  #           "<br>",
-  #           paste("Play:", sample_filtered()$shale_play),
-  #           "<br>",
-  #           paste("Number of Samples:", sample_filtered()$n_samples),
-  #           "<br>",
-  #           paste(
-  #             "Range of days since frack:",
-  #             paste0(
-  #               sample_filtered()$min_days_since_frack,
-  #               "-",
-  #               sample_filtered()$max_days_since_frack
-  #             )
-  #           )
-  #         )
-  #       ) %>%
-  #       groupOptions("Wells", zoomLevels = 1:6) %>%
-  #       groupOptions("jitter2", zoomLevels = 7:20) %>%
-  #       addLegendSize(
-  #         values = sample_filtered()$n_samples,
-  #         color = 'white',
-  #         fillColor = 'white',
-  #         # opacity = 0.5,
-  #         title = HTML("Number of</br> Well Samples"),
-  #         shape = "circle",
-  #         breaks = 4,
-  #         baseSize = 8,
-  #         orientation = "vertical",
-  #         position = "bottomright"
-  #       )
-  #   }
-  # 
-  # })
+  # # proxy for filtering points --------
+   observe({
+ #observeEvent(sample_filtered(), {
+   if (nrow(sample_filtered()) == 0 | is.null(sample_filtered())) {
+     leafletProxy('sample_map') %>%
+       clearGroup(c("Wells", "jitter2")) %>%
+       clearControls()
+   } else {
+     leafletProxy('sample_map') %>%
+       clearGroup(c("Wells", "jitter2")) %>%
+       clearControls() %>%
+       addCircleMarkers(
+         data = sample_jitter1(),
+         group = "Wells",
+         radius = if (input$point_type == "Wells") {~ sqrt(n_samples) * 3} else { ~ salinity_conductivity_m_s_cm/12},
+         #radius = ~ sqrt(n_samples) * 3,
+         stroke = TRUE,
+         weight = 1,
+         color =  "black",
+         fillOpacity = 0.85,
+         fillColor = "white",
+         #fillColor = "#F7AD19",
+         options = pathOptions(pane = "Wells"),
+         popup =  if (input$point_type == "Wells") {paste(
+           "Well:",
+           sample_filtered()$well_id,
+           "<br>",
+           paste("Basin:", sample_filtered()$shale_basin),
+           "<br>",
+           paste("Play:", sample_filtered()$shale_play),
+           "<br>",
+           paste("Number of Samples:", sample_filtered()$n_samples),
+           "<br>",
+           paste(
+             "Range of days since frack:",
+             paste0(
+               sample_filtered()$min_days_since_frack,
+               "-",
+               sample_filtered()$max_days_since_frack
+             )
+           )
+         )} else {paste(
+           "Well:",
+           sample_filtered()$well_id,
+           "<br>",
+           paste("Sample:", sample_filtered()$sample_id),
+           "<br>",
+           paste("Time Series Stage:", sample_filtered()$timeseries_stage),
+           "<br>",
+           paste("Salinity Classification:", sample_filtered()$salinity_classification),
+           "<br>",
+           paste("Salinity Conductivity (mS/cm):", round(sample_filtered()$salinity_conductivity_m_s_cm)),
+           "<br>",
+           paste("Percent Sulfide Producers:", round(sample_filtered()$perc_sulfide_producers)),
+           "<br>",
+           paste("Percent Acetate Producers:", round(sample_filtered()$perc_acetate_producers)),
+           "<br>",
+           paste("Percent Methanogens:", round(sample_filtered()$perc_methanogens))
+           )
+         }
+       ) %>%
+       addCircleMarkers(
+         data = sample_jitter2(),
+         group = "jitter2",
+         radius = if (input$point_type == "Wells") {~ sqrt(n_samples) * 3} else { ~ salinity_conductivity_m_s_cm/12},
+         #radius = ~ sqrt(n_samples) * 3,
+         stroke = TRUE,
+         weight = 1,
+         color = "black",
+         fillOpacity = 0.85,
+         fillColor = "white",
+         options = pathOptions(pane = "Wells"),
+         popup =  if (input$point_type == "Wells") {paste(
+           "Well:",
+           sample_filtered()$well_id,
+           "<br>",
+           paste("Basin:", sample_filtered()$shale_basin),
+           "<br>",
+           paste("Play:", sample_filtered()$shale_play),
+           "<br>",
+           paste("Number of Samples:", sample_filtered()$n_samples),
+           "<br>",
+           paste(
+             "Range of days since frack:",
+             paste0(
+               sample_filtered()$min_days_since_frack,
+               "-",
+               sample_filtered()$max_days_since_frack
+             )
+           )
+         )} else {paste(
+           "Well:",
+           sample_filtered()$well_id,
+           "<br>",
+           paste("Sample:", sample_filtered()$sample_id),
+           "<br>",
+           paste("Time Series Stage:", sample_filtered()$timeseries_stage),
+           "<br>",
+           paste("Salinity Classification:", sample_filtered()$salinity_classification),
+           "<br>",
+           paste("Salinity Conductivity (mS/cm):", round(sample_filtered()$salinity_conductivity_m_s_cm)),
+           "<br>",
+           paste("Percent Sulfide Producers:", round(sample_filtered()$perc_sulfide_producers)),
+           "<br>",
+           paste("Percent Acetate Producers:", round(sample_filtered()$perc_acetate_producers)),
+           "<br>",
+           paste("Percent Methanogens:", round(sample_filtered()$perc_methanogens))
+         )
+         }
+       ) %>%
+       groupOptions("Wells", zoomLevels = 1:6) %>%
+       groupOptions("jitter2", zoomLevels = 7:20) %>%
+       addLegendSize(
+         values = if (input$point_type == "Wells") {sample_filtered()$n_samples} else {sample_filtered()$salinity_conductivity_m_s_cm},
+         color = 'white',
+         fillColor = 'white',
+         # opacity = 0.5,
+         title = if (input$point_type == "Wells") {HTML("Number of</br> Well Samples")} else {HTML("Salinity</br> Conductivity (mS/cm)")},
+         shape = "circle",
+         breaks = 4,
+         baseSize = 8,
+         orientation = "vertical",
+         position = "bottomright"
+       )
+   }
+
+ })
 
   
   # ### zoom to basin ------

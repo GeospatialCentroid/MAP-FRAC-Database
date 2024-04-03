@@ -182,7 +182,7 @@ sample_sf <- sample %>%
     # edit time series stage for filtering
     timeseries_stage = if_else(timeseries_stage == "N/A" | timeseries == "no", "none", timeseries_stage),
     #edit salinity values for filtering
-    salinity_classification = if_else(salinity_classification == "N/A", NA_character_, salinity_classification),
+    #salinity_classification = if_else(salinity_classification == "N/A", NA_character_, salinity_classification),
     salinity_conductivity_m_s_cm = if_else(salinity_conductivity_m_s_cm == "not measured", NA_character_, salinity_conductivity_m_s_cm) %>% 
       as.numeric(.),
     # edit 'N/A' values and make numeric

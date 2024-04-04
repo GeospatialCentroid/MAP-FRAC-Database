@@ -81,7 +81,7 @@ ui <- fluidPage(
                     layout_sidebar(
                       open = TRUE,
                       sidebar = sidebar(
-                        width = 300,
+                        width = 375,
                         position = "right",
                         selectizeInput("zoom_basin", "Zoom to Basin:",
                         choices = basin_names,

@@ -137,7 +137,7 @@ genome_joined <- mag_abundance %>%
 Clean genome data and join to basin shapefile
 
 ```{r}
-genome_clean <- genome_joined %>% 
+genome_app <- genome_joined %>% 
   # remove "Basin" from name and change Denver site name to match
   mutate(Basin = str_replace(basin, " Basin", "") %>% 
            str_replace("DJ", "Denver")) %>% 
@@ -148,10 +148,11 @@ genome_clean <- genome_joined %>%
 
 ```{r}
 # will need to do this within the app using filtered data for 'genome_clean'
-genome_clean %>% 
+genome_app %>% 
   group_by(Basin) %>% 
   summarise(avg_rel_abundance = sum(rel_abundance)) %>% 
-  right_join(sediment_basin, by = c("Basin" = "NAME"))
+  right_join(sediment_basin, by = c("Basin" = "NAME")) %>%
+  st_as_sf()
 
 
 # Old CODE
@@ -179,7 +180,7 @@ genome_clean %>%
 
 ```{r}
 #save updated data
-save(sample_app, sample_inputs, play_basin, sediment_basin, file = "data/app_data_Update.RData")
+save(sample_app, sample_inputs, play_basin, sediment_basin, genome_app, file = "data/app_data_Update.RData")
 
 
 #save(sample_app, genome_app, basin_sample, basin_genome, file = "data/app_data.RData")

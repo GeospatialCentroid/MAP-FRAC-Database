@@ -15,7 +15,7 @@ library(data.table)
 
 
 # read in data
-load("data/app_data.RData")
+#load("data/app_data.RData")
 load("data/app_data_Update.RData")
 
 # create color palettes
@@ -48,6 +48,10 @@ basin_names <- sample_app %>%
   pull(shale_basin) %>% 
   unique()
 
+# fix for NA placement in legend
+css_fix <- "div.info.legend.leaflet-control br {clear: both;}" # CSS to correct spacing
+html_fix <- htmltools::tags$style(type = "text/css", css_fix)  # Convert CSS to HTML
+
 # Define UI -----------------
 ui <- fluidPage(
   class = "container-all",
@@ -62,6 +66,7 @@ ui <- fluidPage(
     #base_font = font_google("Inria Sans")
   ),
   includeCSS("www/style.css"),
+
   
   navbarPage(
     "MAP-FRAC Database",
@@ -610,12 +615,13 @@ server <- function(input, output, session) {
 
   })
 
-  ## select taxonomy
+  # genome filter ----------------
   taxa_mod <- callModule(
     module = selectizeGroupServer,
     id = "taxonomy_filter",
     inline = FALSE,
-    data = st_drop_geometry(genome_app),
+    # for now filter out international basins
+    data = filter(genome_app, !Basin %in% c("Sichuan", "Western Canadian", "Bowland Shale")),
     vars = c(
       "domain",
       "phylum",
@@ -633,36 +639,47 @@ server <- function(input, output, session) {
   
   ## genome map -----
   
+  # reactive polygon layer based on filtered taxa
+  basin_genome <- reactive({
+    taxa_mod() %>% 
+      group_by(Basin) %>% 
+      summarise(avg_rel_abundance = sum(rel_abundance)) %>% 
+      right_join(sediment_basin, by = c("Basin" = "NAME")) %>% 
+      st_as_sf()
+  })
+  
   
   # color palette
   # If you want to set your own colors manually:
-  pal <- colorNumeric(
-    palette = c('#2cb2ba', '#94b674', '#fbb92d'),
-    domain = basin_genome$n_MAG_samples
-  )
+  pal_genome <- reactive({
+    colorNumeric(
+      palette = c('#2cb2ba', '#94b674', '#fbb92d'),
+      domain = basin_genome()$avg_rel_abundance
+    )
+  })
   
   
   output$genome_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
       addPolygons(
-        data = basin_genome,
+        data = basin_genome(),
         stroke = FALSE,
         fillOpacity = 1,
-        fillColor = ~ pal(n_MAG_samples),
+        fillColor = ~ pal_genome()(avg_rel_abundance),
         popup = paste(
           "Basin:",
-          basin_genome$Basin,
+          basin_genome()$Basin,
           "<br>",
-          paste("Number of MAG samples:", basin_genome$n_MAG_samples)
+          paste("Average MAG Relative Abundance:", basin_genome()$avg_rel_abundance)
         )
       ) %>%
       addLegend(
         "bottomright",
-        data = basin_genome,
-        values = ~ n_MAG_samples,
-        pal = pal,
-        title = "Number of <br/> MAG samples"
+        data = basin_genome(),
+        values = ~ avg_rel_abundance,
+        pal = pal_genome(),
+        title = "Average MAG <br/> Relative Abundance"
       )
   })
   

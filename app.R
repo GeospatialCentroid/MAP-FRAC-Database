@@ -643,18 +643,42 @@ server <- function(input, output, session) {
   basin_genome <- reactive({
     taxa_mod() %>% 
       group_by(Basin) %>% 
-      summarise(avg_rel_abundance = sum(rel_abundance)) %>% 
+      summarise(avg_rel_abundance = mean(rel_abundance)) %>% 
       right_join(sediment_basin, by = c("Basin" = "NAME")) %>% 
       st_as_sf()
   })
   
   
+  play_genome <- reactive({
+    taxa_mod() %>% 
+    group_by(Basin) %>% 
+    summarise(avg_rel_abundance = mean(rel_abundance)) %>% 
+    inner_join(play_basin, by = "Basin") %>%
+    st_as_sf()
+  })
+  
   # color palette
   # If you want to set your own colors manually:
-  pal_genome <- reactive({
+  pal_genome_basin <- reactive({
     colorNumeric(
       palette = c('#2cb2ba', '#94b674', '#fbb92d'),
       domain = basin_genome()$avg_rel_abundance
+    )
+  })
+  
+  # temp fix for removing weird placement of NA in legend - remove it entirely
+  pal_noNA <- reactive({
+    colorNumeric(
+      palette = c('#2cb2ba', '#94b674', '#fbb92d'),
+      domain = basin_genome()$avg_rel_abundance,
+      na.color = NA
+    )
+  })
+  
+  pal_genome_play <- reactive({
+    colorNumeric(
+      palette = c('#2cb2ba', '#94b674', '#fbb92d'),
+      domain = play_genome()$avg_rel_abundance
     )
   })
   
@@ -666,19 +690,20 @@ server <- function(input, output, session) {
         data = basin_genome(),
         stroke = FALSE,
         fillOpacity = 1,
-        fillColor = ~ pal_genome()(avg_rel_abundance),
+        fillColor = ~ pal_genome_basin()(avg_rel_abundance),
         popup = paste(
           "Basin:",
           basin_genome()$Basin,
           "<br>",
-          paste("Average MAG Relative Abundance:", basin_genome()$avg_rel_abundance)
+          paste("Average MAG Relative Abundance:", round(basin_genome()$avg_rel_abundance, 2))
         )
       ) %>%
       addLegend(
         "bottomright",
         data = basin_genome(),
-        values = ~ avg_rel_abundance,
-        pal = pal_genome(),
+        values = ~avg_rel_abundance,
+        pal = pal_noNA(),
+        #pal = pal_genome_basin(),
         title = "Average MAG <br/> Relative Abundance"
       )
   })

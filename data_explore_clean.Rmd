@@ -147,11 +147,20 @@ genome_app <- genome_joined %>%
 ```
 
 ```{r}
-# will need to do this within the app using filtered data for 'genome_clean'
+# **will need to do this within the app using filtered data for 'genome_clean'
+
+# basins 
 genome_app %>% 
   group_by(Basin) %>% 
-  summarise(avg_rel_abundance = sum(rel_abundance)) %>% 
+  summarise(avg_rel_abundance = mean(rel_abundance)) %>% 
   right_join(sediment_basin, by = c("Basin" = "NAME")) %>%
+  st_as_sf()
+
+# plays
+genome_app %>% 
+  group_by(Basin) %>% 
+  summarise(avg_rel_abundance = mean(rel_abundance)) %>% 
+  inner_join(play_basin, by = "Basin") %>%
   st_as_sf()
 
 

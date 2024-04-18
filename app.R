@@ -327,7 +327,7 @@ server <- function(input, output, session) {
       ) %>%
       layout(
         showlegend = TRUE,
-        legend = list(title = list(text = 'Shale Basin')),
+        legend = list(title = list(text = 'Shale Basin'), orientation = 'h'),
         xaxis = list(title = "Days Since Frack", gridcolor = "gray"),
         yaxis = list(title = "Fracking Well", gridcolor = "gray"),
         plot_bgcolor = 'transparent',
@@ -463,7 +463,10 @@ server <- function(input, output, session) {
   })
   # 
   # # proxy for filtering points --------
-   observe({
+   # this makes it so the proxy map is rendered in the background, otherwise the map is empty when you first navigate to this page
+   outputOptions(output, "sample_map", suspendWhenHidden=FALSE)
+  
+    observe({
  #observeEvent(sample_filtered(), {
    if (nrow(sample_filtered()) == 0 | is.null(sample_filtered())) {
      leafletProxy('sample_map') %>%

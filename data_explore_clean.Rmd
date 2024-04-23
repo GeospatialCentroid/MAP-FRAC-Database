@@ -160,6 +160,15 @@ genome_app %>%
   group_by(Basin) %>% 
   summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
   right_join(sediment_basin, by = c("Basin" = "NAME")) %>%
+  # create column for pop up
+  # mutate(popup = paste(
+  #           "Basin:",
+  #           basin_genome()$Basin,
+  #           "<br>",
+  #             "Average MAG Relative Abundance:",
+  #             round(basin_genome()$avg_rel_abundance, 2)
+  #           
+  #           )) %>% 
   st_as_sf() %>% 
   View()
 
@@ -170,8 +179,6 @@ genome_app %>%
   group_by(Basin, Play) %>% 
   summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
   inner_join(play_basin, by = c("Play" = "Shale_play")) %>%
-  # create column for popup
-  
   st_as_sf() %>% 
   View()
 

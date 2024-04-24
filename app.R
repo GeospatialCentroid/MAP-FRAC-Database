@@ -1,7 +1,7 @@
 # MAP-FRAC Shiny Web Application #
 ##################################
 
-# set up
+# set up ----
 library(shiny)
 library(shinyWidgets)
 library(bslib)
@@ -66,86 +66,111 @@ ui <- fluidPage(
     #base_font = font_google("Inria Sans")
   ),
   includeCSS("www/style.css"),
-
+  
   
   navbarPage(
     id = "nav",
     "MAP-FRAC Database",
     
+    ## Sample Explorer ----
     tabPanel(
       "Sample Explorer",
-      h4(strong("The Microorganisms Affecting Production in FRACturing systems (MAP-FRAC)
-         database"), "is a metagenomic catalog of microbial functional potential across 
-         geologically-distinct shale basins."),
-      p(style = "color: #a3a2a2", "Explore the",strong("178"), "produced fluid samples from", strong("32"), "fracking wells across",
-        strong("8"), "shale basins underlying the United States."),
-      
-      fluidRow(
-        column(12,
-               card(full_screen = TRUE,
-                    height = 600,
-                    layout_sidebar(
-                      open = TRUE,
-                      sidebar = sidebar(
-                        width = 375,
-                        position = "right",
-                        selectizeInput("zoom_basin", "Zoom to Basin:",
-                        choices = basin_names,
-                        options = list(
-                          placeholder = 'Please select an option below',
-                          onInitialize = I('function() { this.setValue(""); }')
-                        )),
-                        radioGroupButtons("point_type", "View points By:",
-                                          choices = c("Wells", "Samples"),
-                                          selected = "Wells"),
-                        uiOutput("update_panel")),
-                        # radioGroupButtons("time_series", "Wells with timeseries sampling:",
-                        #             choices = c("Yes", "No", "Show All Samples"),
-                        #             selected = "Show All Samples"
-                        #             ),
-                        # uiOutput("time_selection")),
-                        leafletOutput("sample_map", height = "100%")
-                      )
-                    )
-                   ),
-               card(height = 750,
-                   #card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
-                 #card_header(em("De-select basin names from the legend on the right to zoom to certain wells")),
-                   plotlyOutput("timeseries")))
-      
-    ),
-    tabPanel(
-      "Genome Explorer",
-      h4("Placeholder for subheader"),
-                      card(full_screen = TRUE,
-                           height = 600,
-                           layout_sidebar(
-                             open = TRUE, 
-                             sidebar = sidebar(
-                               position = "left",
-                               accordion(open = FALSE,
-                                 accordion_panel("Filter by Taxonomy:",
-                                   selectizeGroupUI(id = "taxonomy_filter",
-                                                                  inline = FALSE,
-                                                                  params = list(
-                                                                    domain = list(inputId = "domain", title = "Domain:"),
-                                                                    phylum = list(inputId = "phylum", title = "Phylum:"),
-                                                                    class = list(inputId = "class", title = "Class:"),
-                                                                    order = list(inputId = "order", title = "Order:"),
-                                                                    family = list(inputId = "family", title = "Family:"),
-                                                                    genus = list(inputId = "genus", title = "Genus:"),
-                                                                    species = list(inputId = "species", title = "Species:")
-                                                                  )))
-                                 )
-                              
-                               ),
-                             leafletOutput("genome_map", height = "100%")
-                           )
+      h4(
+        strong(
+          "The Microorganisms Affecting Production in FRACturing systems (MAP-FRAC)
+         database"
+        ),
+        "is a metagenomic catalog of microbial functional potential across
+         geologically-distinct shale basins."
       ),
-      card(DT::dataTableOutput("genome_table"))
+      p(
+        style = "color: #a3a2a2",
+        "Explore the",
+        strong("178"),
+        "produced fluid samples from",
+        strong("32"),
+        "fracking wells across",
+        strong("8"),
+        "shale basins underlying the United States."
+      ),
+      
+      fluidRow(column(
+        12,
+        card(
+          full_screen = TRUE,
+          height = 600,
+          layout_sidebar(
+            open = TRUE,
+            sidebar = sidebar(
+              width = 375,
+              position = "right",
+              selectizeInput(
+                "zoom_basin",
+                "Zoom to Basin:",
+                choices = basin_names,
+                options = list(
+                  placeholder = 'Please select an option below',
+                  onInitialize = I('function() { this.setValue(""); }')
+                )
+              ),
+              radioGroupButtons(
+                "point_type",
+                "View points By:",
+                choices = c("Wells", "Samples"),
+                selected = "Wells"
+              ),
+              uiOutput("update_panel")
+            ),
+            # radioGroupButtons("time_series", "Wells with timeseries sampling:",
+            #             choices = c("Yes", "No", "Show All Samples"),
+            #             selected = "Show All Samples"
+            #             ),
+            # uiOutput("time_selection")),
+            leafletOutput("sample_map", height = "100%")
+          )
+        )
+      ),
+      card(height = 750,
+           #card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
+           #card_header(em("De-select basin names from the legend on the right to zoom to certain wells")),
+           plotlyOutput("timeseries"))),
+      card(DT::dataTableOutput("sample_table"))),
+      
+      ## Genome Explorer -----
+      tabPanel(
+        "Genome Explorer",
+        h4("Placeholder for subheader"),
+        card(
+          full_screen = TRUE,
+          height = 600,
+          layout_sidebar(
+            open = TRUE,
+            sidebar = sidebar(position = "left",
+                              accordion(
+                                open = FALSE,
+                                accordion_panel(
+                                  "Filter by Taxonomy:",
+                                  selectizeGroupUI(
+                                    id = "taxonomy_filter",
+                                    inline = FALSE,
+                                    params = list(
+                                      domain = list(inputId = "domain", title = "Domain:"),
+                                      phylum = list(inputId = "phylum", title = "Phylum:"),
+                                      class = list(inputId = "class", title = "Class:"),
+                                      order = list(inputId = "order", title = "Order:"),
+                                      family = list(inputId = "family", title = "Family:"),
+                                      genus = list(inputId = "genus", title = "Genus:"),
+                                      species = list(inputId = "species", title = "Species:")
+                                    )
+                                  )
+                                )
+                              )),
+            leafletOutput("genome_map", height = "100%")
+          )
+        ),
+      card(DT::dataTableOutput("genome_table"), height = "100%")
       
     )
-    
   )
 )
 
@@ -402,7 +427,7 @@ server <- function(input, output, session) {
   })
   
   
-  # # sample map ----
+  ## sample map ----
   output$sample_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
@@ -474,7 +499,7 @@ server <- function(input, output, session) {
       )
   })
   # 
-  # # proxy for filtering points --------
+  ### proxy for filtering points --------
   
    observe({
      input$nav
@@ -667,7 +692,7 @@ server <- function(input, output, session) {
    })
    
   
-  # ### zoom to basin ------
+  ### zoom to basin ------
   observeEvent(input$zoom_basin, {
     if (input$zoom_basin == "") {
       leafletProxy("sample_map")
@@ -690,6 +715,13 @@ server <- function(input, output, session) {
 
 
   })
+   
+   
+   ## sample table ------
+   output$sample_table <- DT::renderDataTable(st_drop_geometry(sample_app),
+                                              options = list(dom = "ft",
+                                                             pageLength = 1000))
+   
 
   # genome filter ----------------
   taxa_mod <- callModule(
@@ -708,10 +740,6 @@ server <- function(input, output, session) {
       "species"
     )
   )
-  output$genome_table <- DT::renderDataTable(taxa_mod())
-  
-  
-  
   
   ## genome map -----
   
@@ -836,6 +864,10 @@ server <- function(input, output, session) {
     
   })
   
+  ## genome table ------
+  output$genome_table <- DT::renderDataTable(taxa_mod(),
+                                             options = list(dom = "ft",
+                                                            pageLength = 1000))
   
   
 }

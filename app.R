@@ -93,82 +93,74 @@ ui <- fluidPage(
         strong("8"),
         "shale basins underlying the United States."
       ),
-      
-      fluidRow(column(
-        12,
-        card(
-          full_screen = TRUE,
-          height = 600,
-          layout_sidebar(
-            open = TRUE,
-            sidebar = sidebar(
-              width = 375,
-              position = "right",
-              selectizeInput(
-                "zoom_basin",
-                "Zoom to Basin:",
-                choices = basin_names,
-                options = list(
-                  placeholder = 'Please select an option below',
-                  onInitialize = I('function() { this.setValue(""); }')
-                )
-              ),
-              radioGroupButtons(
-                "point_type",
-                "View points By:",
-                choices = c("Wells", "Samples"),
-                selected = "Wells"
-              ),
-              uiOutput("update_panel")
+      card(
+        full_screen = TRUE,
+        height = 600,
+        layout_sidebar(
+          open = TRUE,
+          sidebar = sidebar(
+            width = 375,
+            position = "right",
+            selectizeInput(
+              "zoom_basin",
+              "Zoom to Basin:",
+              choices = basin_names,
+              options = list(
+                placeholder = 'Please select an option below',
+                onInitialize = I('function() { this.setValue(""); }')
+              )
             ),
-            # radioGroupButtons("time_series", "Wells with timeseries sampling:",
-            #             choices = c("Yes", "No", "Show All Samples"),
-            #             selected = "Show All Samples"
-            #             ),
-            # uiOutput("time_selection")),
-            leafletOutput("sample_map", height = "100%")
-          )
+            radioGroupButtons(
+              "point_type",
+              "View points By:",
+              choices = c("Wells", "Samples"),
+              selected = "Wells"
+            ),
+            uiOutput("update_panel")
+          ),
+          leafletOutput("sample_map", height = "100%")
         )
       ),
       card(height = 750,
            #card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
            #card_header(em("De-select basin names from the legend on the right to zoom to certain wells")),
-           plotlyOutput("timeseries"))),
-      card(DT::dataTableOutput("sample_table"))),
-      
-      ## Genome Explorer -----
-      tabPanel(
-        "Genome Explorer",
-        h4("Placeholder for subheader"),
-        card(
-          full_screen = TRUE,
-          height = 600,
-          layout_sidebar(
-            open = TRUE,
-            sidebar = sidebar(position = "left",
-                              accordion(
-                                open = FALSE,
-                                accordion_panel(
-                                  "Filter by Taxonomy:",
-                                  selectizeGroupUI(
-                                    id = "taxonomy_filter",
-                                    inline = FALSE,
-                                    params = list(
-                                      domain = list(inputId = "domain", title = "Domain:"),
-                                      phylum = list(inputId = "phylum", title = "Phylum:"),
-                                      class = list(inputId = "class", title = "Class:"),
-                                      order = list(inputId = "order", title = "Order:"),
-                                      family = list(inputId = "family", title = "Family:"),
-                                      genus = list(inputId = "genus", title = "Genus:"),
-                                      species = list(inputId = "species", title = "Species:")
-                                    )
+           plotlyOutput("timeseries")),
+      card(height = 600, DT::dataTableOutput("sample_table"))
+    ),
+    
+    ## Genome Explorer -----
+    tabPanel(
+      "Genome Explorer",
+      h4("Placeholder for subheader"),
+      card(
+        full_screen = TRUE,
+        height = 600,
+        layout_sidebar(
+          open = TRUE,
+          sidebar = sidebar(position = "left",
+                            accordion(
+                              open = FALSE,
+                              accordion_panel(
+                                "Filter by Taxonomy:",
+                                selectizeGroupUI(
+                                  id = "taxonomy_filter",
+                                  inline = FALSE,
+                                  params = list(
+                                    domain = list(inputId = "domain", title = "Domain:"),
+                                    phylum = list(inputId = "phylum", title = "Phylum:"),
+                                    class = list(inputId = "class", title = "Class:"),
+                                    order = list(inputId = "order", title = "Order:"),
+                                    family = list(inputId = "family", title = "Family:"),
+                                    genus = list(inputId = "genus", title = "Genus:"),
+                                    species = list(inputId = "species", title = "Species:")
                                   )
                                 )
-                              )),
-            leafletOutput("genome_map", height = "100%")
-          )
-        ),
-      card(DT::dataTableOutput("genome_table"), height = "100%")
+                              )
+                            )),
+          leafletOutput("genome_map", height = "100%")
+        )
+      ),
+      card(height = 600, DT::dataTableOutput("genome_table"))
       
     )
   )
@@ -719,8 +711,7 @@ server <- function(input, output, session) {
    
    ## sample table ------
    output$sample_table <- DT::renderDataTable(st_drop_geometry(sample_app),
-                                              options = list(dom = "ft",
-                                                             pageLength = 1000))
+                                              options = list(paging = FALSE))
    
 
   # genome filter ----------------
@@ -761,7 +752,7 @@ server <- function(input, output, session) {
       summarise(max_rel_abundance = max(rel_abundance)) %>% 
       group_by(Basin, Play) %>% 
       summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
-    inner_join(play_basin, by = "Basin") %>%
+    inner_join(play_basin, by = c("Basin", "Play" = "Shale_play")) %>%
     st_as_sf()
   })
   
@@ -832,25 +823,25 @@ server <- function(input, output, session) {
             round(basin_genome()$avg_rel_abundance, 2)
           )
         ) %>%
-        # addPolygons(
-        #   group = "Plays",
-        #   data = play_genome(),
-        #   stroke = FALSE,
-        #   fillOpacity = 0.85,
-        #   fillColor = ~ pal_genome_play()(avg_rel_abundance),
-        #   popup = paste(
-        #     "Basin:",
-        #     play_genome()$Basin,
-        #     "<br>",
-        #     "Play:",
-        #     play_genome()$Play,
-        #     "<br>",
-        #     paste(
-        #       "Average MAG Relative Abundance:",
-        #       round(play_genome()$avg_rel_abundance, 2)
-        #     )
-        #   )
-        # ) %>% 
+        addPolygons(
+          group = "Plays",
+          data = play_genome(),
+          stroke = FALSE,
+          fillOpacity = 0.85,
+          fillColor = ~ pal_genome_play()(avg_rel_abundance),
+          popup = paste(
+            "Basin:",
+            play_genome()$Basin,
+            "<br>",
+            "Play:",
+            play_genome()$Play,
+            "<br>",
+            paste(
+              "Average MAG Relative Abundance:",
+              round(play_genome()$avg_rel_abundance, 2)
+            )
+          )
+        ) %>%
         addLegend(
           "bottomright",
           data = basin_genome(),
@@ -866,8 +857,7 @@ server <- function(input, output, session) {
   
   ## genome table ------
   output$genome_table <- DT::renderDataTable(taxa_mod(),
-                                             options = list(dom = "ft",
-                                                            pageLength = 1000))
+                                             options = list(paging = FALSE))
   
   
 }

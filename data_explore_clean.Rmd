@@ -17,10 +17,7 @@ library(mapview)
 sample <- read_xlsx("data/SAMPLE_geospatial_metadata_3.28.24.xlsx") %>% 
   janitor::clean_names()
 
-genome <- read_xlsx("data/GENOME_geospatial_metadata.xlsx") %>%
-  # clean basin names to join with mag abundance data
-  mutate(Basin = str_remove_all(basin, " ") %>%
-           str_remove_all(., "Basin"))
+genome <- read_xlsx("data/GENOME_geospatial_metadata.xlsx")
   
 
 mag_abundance <- read_xlsx("data/MAGs_average_relativeabund_by_basin.xlsx")
@@ -135,7 +132,8 @@ Tie abundance data to genome data
 ```{r}
 genome_joined <- mag_abundance %>% 
   dplyr::select(MAG_ID = MAG, rel_abundance = aveRelAbund, Play, Basin) %>% 
-  left_join(genome, by = c("MAG_ID", "Basin"))
+  left_join(genome, by = c("MAG_ID")) %>% 
+  select(-basin)
 ```
 
 Clean genome data and join to basin shapefile
@@ -143,8 +141,8 @@ Clean genome data and join to basin shapefile
 ```{r}
 genome_app <- genome_joined %>% 
   # remove "Basin" from name and change Denver site name to match
-  mutate(Basin = str_replace(basin, " Basin", "") %>% 
-           str_replace("DJ", "Denver")) %>% 
+  # mutate(Basin = str_replace(basin, " Basin", "") %>% 
+  #          str_replace("DJ", "Denver")) %>% 
            # trailing spaces were causing errors in join
             #str_remove_all(" ")) %>% 
   mutate(across(domain:species, ~str_remove(.x, ".*__")))

@@ -132,11 +132,12 @@ ui <- fluidPage(
     tabPanel(
       "Genome Explorer",
       h4("Placeholder for subheader"),
-      card(
+      navset_card_tab(
+        title = "",
         full_screen = TRUE,
         height = 600,
-        layout_sidebar(
-          open = TRUE,
+        # layout_sidebar(
+        #   open = TRUE,
           sidebar = sidebar(position = "left",
                             accordion(
                               open = FALSE,
@@ -156,10 +157,15 @@ ui <- fluidPage(
                                   )
                                 )
                               )
-                            )),
-          leafletOutput("genome_map", height = "100%")
-        )
-      ),
+                            )
+          ),
+        nav_panel("MAG Relative Abundance",
+                  leafletOutput("genome_map", height = "100%")),
+        nav_panel("MAG Cores",
+                  leafletOutput("cores_map"))
+
+          
+          ),
       card(height = 600, DT::dataTableOutput("genome_table"))
       
     )

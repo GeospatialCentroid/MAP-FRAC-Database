@@ -1,7 +1,7 @@
 # MAP-FRAC Shiny Web Application #
 ##################################
 
-# set up
+# set up ----
 library(shiny)
 library(shinyWidgets)
 library(bslib)
@@ -15,10 +15,10 @@ library(data.table)
 
 
 # read in data
-load("data/app_data.RData")
+#load("data/app_data.RData")
 load("data/app_data_Update.RData")
 
-# create color palettes
+# create color palettes (this is a hacky way based on alphabetical order of basin names)
 pal_basin <- colorFactor(
   palette = c("#72266C", "#0A81A7", rep("grey", 5), "#F15F26", rep("grey", 3),
               "#D58D4E", rep("grey", 3), "#47B862", rep("grey", 4), "#FDBB3D",
@@ -48,6 +48,10 @@ basin_names <- sample_app %>%
   pull(shale_basin) %>% 
   unique()
 
+# fix for NA placement in legend
+css_fix <- "div.info.legend.leaflet-control br {clear: both;}" # CSS to correct spacing
+html_fix <- htmltools::tags$style(type = "text/css", css_fix)  # Convert CSS to HTML
+
 # Define UI -----------------
 ui <- fluidPage(
   class = "container-all",
@@ -63,82 +67,108 @@ ui <- fluidPage(
   ),
   includeCSS("www/style.css"),
   
+  
   navbarPage(
+    id = "nav",
     "MAP-FRAC Database",
     
+    ## Sample Explorer ----
     tabPanel(
       "Sample Explorer",
-      h4(strong("The Microorganisms Affecting Production in FRACturing systems (MAP-FRAC)
-         database"), "is a metagenomic catalog of microbial functional potential across 
-         geologically-distinct shale basins."),
-      p(style = "color: #a3a2a2", "Explore the",strong("178"), "produced fluid samples from", strong("32"), "fracking wells across",
-        strong("8"), "shale basins underlying the United States."),
-      
-      fluidRow(
-        column(12,
-               card(full_screen = TRUE,
-                    height = 600,
-                    layout_sidebar(
-                      open = TRUE,
-                      sidebar = sidebar(
-                        width = 300,
-                        position = "right",
-                        selectizeInput("zoom_basin", "Zoom to Basin:",
-                        choices = basin_names,
-                        options = list(
-                          placeholder = 'Please select an option below',
-                          onInitialize = I('function() { this.setValue(""); }')
-                        )),
-                        radioGroupButtons("point_type", "View points By:",
-                                          choices = c("Wells", "Samples"),
-                                          selected = "Wells"),
-                        uiOutput("update_panel")),
-                        # radioGroupButtons("time_series", "Wells with timeseries sampling:",
-                        #             choices = c("Yes", "No", "Show All Samples"),
-                        #             selected = "Show All Samples"
-                        #             ),
-                        # uiOutput("time_selection")),
-                        leafletOutput("sample_map", height = "100%")
-                      )
-                    )
-                   ),
-               card(height = 750,
-                   #card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
-                 #card_header(em("De-select basin names from the legend on the right to zoom to certain wells")),
-                   plotlyOutput("timeseries")))
-      
+      h4(
+        strong(
+          "The Microorganisms Affecting Production in FRACturing systems (MAP-FRAC)
+         database"
+        ),
+        "is a metagenomic catalog of microbial functional potential across
+         geologically-distinct shale basins."
+      ),
+      p(
+        style = "color: #a3a2a2",
+        "Explore the",
+        strong("178"),
+        "produced fluid samples from",
+        strong("32"),
+        "fracking wells across",
+        strong("8"),
+        "shale basins underlying the United States."
+      ),
+      card(
+        full_screen = TRUE,
+        height = 600,
+        layout_sidebar(
+          open = TRUE,
+          sidebar = sidebar(
+            width = 375,
+            position = "right",
+            selectizeInput(
+              "zoom_basin",
+              "Zoom to Basin:",
+              choices = basin_names,
+              options = list(
+                placeholder = 'Please select an option below',
+                onInitialize = I('function() { this.setValue(""); }')
+              )
+            ),
+            radioGroupButtons(
+              "point_type",
+              "View points By:",
+              choices = c("Wells", "Samples"),
+              selected = "Wells"
+            ),
+            uiOutput("update_panel")
+          ),
+          leafletOutput("sample_map", height = "100%")
+        )
+      ),
+      card(height = 750,
+           #card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
+           #card_header(em("De-select basin names from the legend on the right to zoom to certain wells")),
+           plotlyOutput("timeseries")),
+      card(height = 600, DT::dataTableOutput("sample_table"))
     ),
+    
+    ## Genome Explorer -----
     tabPanel(
       "Genome Explorer",
       h4("Placeholder for subheader"),
-                      card(full_screen = TRUE,
-                           layout_sidebar(
-                             open = TRUE, 
-                             sidebar = sidebar(
-                               position = "left",
-                               accordion(open = FALSE,
-                                 accordion_panel("Filter by Taxonomy:",
-                                   selectizeGroupUI(id = "taxonomy_filter",
-                                                                  inline = FALSE,
-                                                                  params = list(
-                                                                    domain = list(inputId = "domain", title = "Domain:"),
-                                                                    phylum = list(inputId = "phylum", title = "Phylum:"),
-                                                                    class = list(inputId = "class", title = "Class:"),
-                                                                    order = list(inputId = "order", title = "Order:"),
-                                                                    family = list(inputId = "family", title = "Family:"),
-                                                                    genus = list(inputId = "genus", title = "Genus:"),
-                                                                    species = list(inputId = "species", title = "Species:")
-                                                                  )))
-                                 )
-                              
-                               ),
-                             leafletOutput("genome_map")
-                           )
-      ),
-      card(DT::dataTableOutput("genome_table"))
+      navset_card_tab(
+        title = "",
+        full_screen = TRUE,
+        height = 600,
+        # layout_sidebar(
+        #   open = TRUE,
+          sidebar = sidebar(position = "left",
+                            accordion(
+                              open = FALSE,
+                              accordion_panel(
+                                "Filter by Taxonomy:",
+                                selectizeGroupUI(
+                                  id = "taxonomy_filter",
+                                  inline = FALSE,
+                                  params = list(
+                                    domain = list(inputId = "domain", title = "Domain:"),
+                                    phylum = list(inputId = "phylum", title = "Phylum:"),
+                                    class = list(inputId = "class", title = "Class:"),
+                                    order = list(inputId = "order", title = "Order:"),
+                                    family = list(inputId = "family", title = "Family:"),
+                                    genus = list(inputId = "genus", title = "Genus:"),
+                                    species = list(inputId = "species", title = "Species:")
+                                  )
+                                )
+                              )
+                            )
+          ),
+        nav_panel("MAG Relative Abundance",
+                  leafletOutput("genome_map", height = "100%")),
+        nav_panel("MAG Cores",
+                  leafletOutput("cores_map"))
+
+          
+          ),
+      card(height = 600, DT::dataTableOutput("genome_table"))
       
     )
-    
   )
 )
 
@@ -147,7 +177,7 @@ server <- function(input, output, session) {
   
 
   
-  # update UI based on point type selection
+  ## update UI based on point type selection -------------
   output$update_panel <- renderUI({
     if (input$point_type == "Wells") {
       wellPanel(
@@ -163,6 +193,16 @@ server <- function(input, output, session) {
       )
     } else {
       wellPanel(
+        selectizeInput("sample_var_size",
+                    "Size Points By:",
+                    choices = c("Salinity" = "salinity_conductivity_m_s_cm",
+                                "Percent Sulfide Producers" = "perc_sulfide_producers",
+                                "Percent Acetate Producers" = "perc_acetate_producers",
+                                "Percent Methanogens" = "perc_methanogens"),
+                    options = list(
+                      placeholder = 'Please select an option below',
+                      onInitialize = I('function() { this.setValue(""); }')
+                    )),
         p("Filter Samples:"),
         sliderInput("salinity_range","Salinity (Conductivity in mS/cm)",
                     min = min(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE),
@@ -322,7 +362,7 @@ server <- function(input, output, session) {
       ) %>%
       layout(
         showlegend = TRUE,
-        legend = list(title = list(text = 'Shale Basin')),
+        legend = list(title = list(text = 'Shale Basin'), orientation = 'h'),
         xaxis = list(title = "Days Since Frack", gridcolor = "gray"),
         yaxis = list(title = "Fracking Well", gridcolor = "gray"),
         plot_bgcolor = 'transparent',
@@ -385,7 +425,7 @@ server <- function(input, output, session) {
   })
   
   
-  # # sample map ----
+  ## sample map ----
   output$sample_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
@@ -457,136 +497,200 @@ server <- function(input, output, session) {
       )
   })
   # 
-  # # proxy for filtering points --------
-   observe({
- #observeEvent(sample_filtered(), {
-   if (nrow(sample_filtered()) == 0 | is.null(sample_filtered())) {
-     leafletProxy('sample_map') %>%
-       clearGroup(c("Wells", "jitter2")) %>%
-       clearControls()
-   } else {
-     leafletProxy('sample_map') %>%
-       clearGroup(c("Wells", "jitter2")) %>%
-       clearControls() %>%
-       addCircleMarkers(
-         data = sample_jitter1(),
-         group = "Wells",
-         radius = if (input$point_type == "Wells") {~ sqrt(n_samples) * 3} else { ~ salinity_conductivity_m_s_cm/12},
-         #radius = ~ sqrt(n_samples) * 3,
-         stroke = TRUE,
-         weight = 1,
-         color =  "black",
-         fillOpacity = 0.85,
-         fillColor = "white",
-         #fillColor = "#F7AD19",
-         options = pathOptions(pane = "Wells"),
-         popup =  if (input$point_type == "Wells") {paste(
-           "Well:",
-           sample_filtered()$well_id,
-           "<br>",
-           paste("Basin:", sample_filtered()$shale_basin),
-           "<br>",
-           paste("Play:", sample_filtered()$shale_play),
-           "<br>",
-           paste("Number of Samples:", sample_filtered()$n_samples),
-           "<br>",
-           paste(
-             "Range of days since frack:",
-             paste0(
-               sample_filtered()$min_days_since_frack,
-               "-",
-               sample_filtered()$max_days_since_frack
-             )
-           )
-         )} else {paste(
-           "Well:",
-           sample_filtered()$well_id,
-           "<br>",
-           paste("Sample:", sample_filtered()$sample_id),
-           "<br>",
-           paste("Time Series Stage:", sample_filtered()$timeseries_stage),
-           "<br>",
-           paste("Salinity Classification:", sample_filtered()$salinity_classification),
-           "<br>",
-           paste("Salinity Conductivity (mS/cm):", round(sample_filtered()$salinity_conductivity_m_s_cm)),
-           "<br>",
-           paste("Percent Sulfide Producers:", round(sample_filtered()$perc_sulfide_producers)),
-           "<br>",
-           paste("Percent Acetate Producers:", round(sample_filtered()$perc_acetate_producers)),
-           "<br>",
-           paste("Percent Methanogens:", round(sample_filtered()$perc_methanogens))
-           )
-         }
-       ) %>%
-       addCircleMarkers(
-         data = sample_jitter2(),
-         group = "jitter2",
-         radius = if (input$point_type == "Wells") {~ sqrt(n_samples) * 3} else { ~ salinity_conductivity_m_s_cm/12},
-         #radius = ~ sqrt(n_samples) * 3,
-         stroke = TRUE,
-         weight = 1,
-         color = "black",
-         fillOpacity = 0.85,
-         fillColor = "white",
-         options = pathOptions(pane = "Wells"),
-         popup =  if (input$point_type == "Wells") {paste(
-           "Well:",
-           sample_filtered()$well_id,
-           "<br>",
-           paste("Basin:", sample_filtered()$shale_basin),
-           "<br>",
-           paste("Play:", sample_filtered()$shale_play),
-           "<br>",
-           paste("Number of Samples:", sample_filtered()$n_samples),
-           "<br>",
-           paste(
-             "Range of days since frack:",
-             paste0(
-               sample_filtered()$min_days_since_frack,
-               "-",
-               sample_filtered()$max_days_since_frack
-             )
-           )
-         )} else {paste(
-           "Well:",
-           sample_filtered()$well_id,
-           "<br>",
-           paste("Sample:", sample_filtered()$sample_id),
-           "<br>",
-           paste("Time Series Stage:", sample_filtered()$timeseries_stage),
-           "<br>",
-           paste("Salinity Classification:", sample_filtered()$salinity_classification),
-           "<br>",
-           paste("Salinity Conductivity (mS/cm):", round(sample_filtered()$salinity_conductivity_m_s_cm)),
-           "<br>",
-           paste("Percent Sulfide Producers:", round(sample_filtered()$perc_sulfide_producers)),
-           "<br>",
-           paste("Percent Acetate Producers:", round(sample_filtered()$perc_acetate_producers)),
-           "<br>",
-           paste("Percent Methanogens:", round(sample_filtered()$perc_methanogens))
-         )
-         }
-       ) %>%
-       groupOptions("Wells", zoomLevels = 1:6) %>%
-       groupOptions("jitter2", zoomLevels = 7:20) %>%
-       addLegendSize(
-         values = if (input$point_type == "Wells") {sample_filtered()$n_samples} else {sample_filtered()$salinity_conductivity_m_s_cm},
-         color = 'white',
-         fillColor = 'white',
-         # opacity = 0.5,
-         title = if (input$point_type == "Wells") {HTML("Number of</br> Well Samples")} else {HTML("Salinity</br> Conductivity (mS/cm)")},
-         shape = "circle",
-         breaks = 4,
-         baseSize = 8,
-         orientation = "vertical",
-         position = "bottomright"
-       )
-   }
-
- })
-
+  ### proxy for filtering points --------
   
-  # ### zoom to basin ------
+   observe({
+     input$nav
+     #observeEvent(sample_filtered(), {
+     if (nrow(sample_filtered()) == 0 | is.null(sample_filtered())) {
+       leafletProxy('sample_map') %>%
+         clearGroup(c("Wells", "jitter2")) %>%
+         clearControls()
+     } else {
+       leafletProxy('sample_map') %>%
+         clearGroup(c("Wells", "jitter2")) %>%
+         clearControls() %>%
+         addCircleMarkers(
+           data = sample_jitter1(),
+           group = "Wells",
+           radius = if (input$point_type == "Wells") {
+             ~ sqrt(n_samples) * 3
+           } else {
+             if (input$sample_var_size == "") {
+               6
+             } else {
+               ~ sqrt(sample_jitter1()[[input$sample_var_size]])
+             }
+           },
+       #radius = ~ sqrt(n_samples) * 3,
+           stroke = TRUE,
+           weight = 1,
+           color =  "black",
+           fillOpacity = 0.85,
+           fillColor = "white",
+           #fillColor = "#F7AD19",
+           options = pathOptions(pane = "Wells"),
+           popup =  if (input$point_type == "Wells") {
+             paste(
+               "Well:",
+               sample_filtered()$well_id,
+               "<br>",
+               paste("Basin:", sample_filtered()$shale_basin),
+               "<br>",
+               paste("Play:", sample_filtered()$shale_play),
+               "<br>",
+               paste("Number of Samples:", sample_filtered()$n_samples),
+               "<br>",
+               paste(
+                 "Range of days since frack:",
+                 paste0(
+                   sample_filtered()$min_days_since_frack,
+                   "-",
+                   sample_filtered()$max_days_since_frack
+                 )
+               )
+             )
+           } else {
+             paste(
+               "Well:",
+               sample_filtered()$well_id,
+               "<br>",
+               paste("Sample:", sample_filtered()$sample_id),
+               "<br>",
+               paste(
+                 "Time Series Stage:",
+                 sample_filtered()$timeseries_stage
+               ),
+               "<br>",
+               paste(
+                 "Salinity Classification:",
+                 sample_filtered()$salinity_classification
+               ),
+               "<br>",
+               paste(
+                 "Salinity Conductivity (mS/cm):",
+                 round(sample_filtered()$salinity_conductivity_m_s_cm)
+               ),
+               "<br>",
+               paste(
+                 "Percent Sulfide Producers:",
+                 round(sample_filtered()$perc_sulfide_producers)
+               ),
+               "<br>",
+               paste(
+                 "Percent Acetate Producers:",
+                 round(sample_filtered()$perc_acetate_producers)
+               ),
+               "<br>",
+               paste(
+                 "Percent Methanogens:",
+                 round(sample_filtered()$perc_methanogens)
+               )
+             )
+           }
+         ) %>%
+         addCircleMarkers(
+           data = sample_jitter2(),
+           group = "jitter2",
+           radius = if (input$point_type == "Wells") {
+             ~ sqrt(n_samples) * 3
+           } else {
+             ~ salinity_conductivity_m_s_cm / 12
+           },
+           #radius = ~ sqrt(n_samples) * 3,
+           stroke = TRUE,
+           weight = 1,
+           color = "black",
+           fillOpacity = 0.85,
+           fillColor = "white",
+           options = pathOptions(pane = "Wells"),
+           popup =  if (input$point_type == "Wells") {
+             paste(
+               "Well:",
+               sample_filtered()$well_id,
+               "<br>",
+               paste("Basin:", sample_filtered()$shale_basin),
+               "<br>",
+               paste("Play:", sample_filtered()$shale_play),
+               "<br>",
+               paste("Number of Samples:", sample_filtered()$n_samples),
+               "<br>",
+               paste(
+                 "Range of days since frack:",
+                 paste0(
+                   sample_filtered()$min_days_since_frack,
+                   "-",
+                   sample_filtered()$max_days_since_frack
+                 )
+               )
+             )
+           } else {
+             paste(
+               "Well:",
+               sample_filtered()$well_id,
+               "<br>",
+               paste("Sample:", sample_filtered()$sample_id),
+               "<br>",
+               paste(
+                 "Time Series Stage:",
+                 sample_filtered()$timeseries_stage
+               ),
+               "<br>",
+               paste(
+                 "Salinity Classification:",
+                 sample_filtered()$salinity_classification
+               ),
+               "<br>",
+               paste(
+                 "Salinity Conductivity (mS/cm):",
+                 round(sample_filtered()$salinity_conductivity_m_s_cm)
+               ),
+               "<br>",
+               paste(
+                 "Percent Sulfide Producers:",
+                 round(sample_filtered()$perc_sulfide_producers)
+               ),
+               "<br>",
+               paste(
+                 "Percent Acetate Producers:",
+                 round(sample_filtered()$perc_acetate_producers)
+               ),
+               "<br>",
+               paste(
+                 "Percent Methanogens:",
+                 round(sample_filtered()$perc_methanogens)
+               )
+             )
+           }
+         ) %>%
+         groupOptions("Wells", zoomLevels = 1:6) %>%
+         groupOptions("jitter2", zoomLevels = 7:20) %>%
+         addLegendSize(
+           values = if (input$point_type == "Wells") {
+             sample_filtered()$n_samples
+           } else {
+             sample_filtered()[[input$sample_var_size]]
+           },
+           color = 'white',
+           fillColor = 'white',
+           # opacity = 0.5,
+           title = if (input$point_type == "Wells") {
+             HTML("Number of</br> Well Samples")
+           } else {
+             HTML("Selected Size Variable:")
+           },
+           shape = "circle",
+           breaks = 4,
+           baseSize = 8,
+           orientation = "vertical",
+           position = "bottomright"
+         )
+     }
+     
+   })
+   
+  
+  ### zoom to basin ------
   observeEvent(input$zoom_basin, {
     if (input$zoom_basin == "") {
       leafletProxy("sample_map")
@@ -609,13 +713,20 @@ server <- function(input, output, session) {
 
 
   })
+   
+   
+   ## sample table ------
+   output$sample_table <- DT::renderDataTable(st_drop_geometry(sample_app),
+                                              options = list(paging = FALSE))
+   
 
-  ## select taxonomy
+  # genome filter ----------------
   taxa_mod <- callModule(
     module = selectizeGroupServer,
     id = "taxonomy_filter",
     inline = FALSE,
-    data = st_drop_geometry(genome_app),
+    # for now filter out international basins
+    data = filter(genome_app, !Basin %in% c("Sichuan", "Western Canadian", "Bowland Shale")),
     vars = c(
       "domain",
       "phylum",
@@ -626,46 +737,133 @@ server <- function(input, output, session) {
       "species"
     )
   )
-  output$genome_table <- DT::renderDataTable(taxa_mod())
-  
-  
-  
   
   ## genome map -----
   
+  # reactive polygon layer based on filtered taxa
+  basin_genome <- reactive({
+    taxa_mod() %>% 
+      group_by(Basin, domain, phylum, class, order, family, genus, species) %>% 
+      summarise(max_rel_abundance = max(rel_abundance)) %>% 
+      group_by(Basin) %>% 
+      summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
+      right_join(sediment_basin, by = c("Basin" = "NAME")) %>% 
+      st_as_sf()
+  })
+  
+  
+  play_genome <- reactive({
+    taxa_mod() %>% 
+      group_by(Basin, Play, domain, phylum, class, order, family, genus, species) %>% 
+      summarise(max_rel_abundance = max(rel_abundance)) %>% 
+      group_by(Basin, Play) %>% 
+      summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
+    inner_join(play_basin, by = c("Basin", "Play" = "Shale_play")) %>%
+    st_as_sf()
+  })
   
   # color palette
-  # If you want to set your own colors manually:
-  pal <- colorNumeric(
-    palette = c('#2cb2ba', '#94b674', '#fbb92d'),
-    domain = basin_genome$n_MAG_samples
-  )
+  pal_genome_basin <- reactive({
+    colorNumeric(
+      palette = c('#2cb2ba', '#94b674', '#fbb92d'),
+      domain = basin_genome()$avg_rel_abundance
+    )
+  })
   
+  # temp fix for removing weird placement of NA in legend - remove it entirely
+  pal_noNA <- reactive({
+    colorNumeric(
+      palette = c('#2cb2ba', '#94b674', '#fbb92d'),
+      domain = basin_genome()$avg_rel_abundance,
+      na.color = NA
+    )
+  })
+  
+  pal_genome_play <- reactive({
+    colorNumeric(
+      palette = c('#2cb2ba', '#94b674', '#fbb92d'),
+      domain = play_genome()$avg_rel_abundance
+    )
+  })
+  
+  # pull basin bounds for default view
+  bbox <- st_bbox(sediment_basin) %>% as.vector()
   
   output$genome_map <- leaflet::renderLeaflet({
     leaflet() %>%
+      fitBounds(bbox[1], bbox[2], bbox[3], bbox[4]) %>% 
       addProviderTiles("OpenStreetMap") %>%
-      addPolygons(
-        data = basin_genome,
-        stroke = FALSE,
-        fillOpacity = 1,
-        fillColor = ~ pal(n_MAG_samples),
-        popup = paste(
-          "Basin:",
-          basin_genome$Basin,
-          "<br>",
-          paste("Number of MAG samples:", basin_genome$n_MAG_samples)
-        )
-      ) %>%
-      addLegend(
-        "bottomright",
-        data = basin_genome,
-        values = ~ n_MAG_samples,
-        pal = pal,
-        title = "Number of <br/> MAG samples"
+      addMapPane("Basins", zIndex = 410) %>%
+      addMapPane("Plays", zIndex = 420) %>%
+      addScaleBar(position = "bottomright") %>%
+      addLayersControl(
+        position = "bottomleft",
+        overlayGroups = c("Basins", "Plays"),
+        options = layersControlOptions(collapsed = FALSE)
       )
   })
   
+  observe({
+    
+    input$nav
+    
+    if (nrow(basin_genome()) == 0 | is.null(basin_genome())) {
+      leafletProxy('genome_map') %>%
+        clearGroup(c("Basins", "Plays")) %>% 
+        clearControls()
+    } else {
+      leafletProxy('genome_map') %>%
+        clearGroup(c("Basins", "Plays")) %>%
+        clearControls() %>%
+        addPolygons(
+          group = "Basins",
+          data = basin_genome(),
+          stroke = FALSE,
+          fillOpacity = 0.65,
+          fillColor = ~ pal_genome_basin()(avg_rel_abundance),
+          popup = paste(
+            "Basin:",
+            basin_genome()$Basin,
+            "<br>",
+            "Average MAG Relative Abundance:",
+            round(basin_genome()$avg_rel_abundance, 2)
+          )
+        ) %>%
+        addPolygons(
+          group = "Plays",
+          data = play_genome(),
+          stroke = FALSE,
+          fillOpacity = 0.85,
+          fillColor = ~ pal_genome_play()(avg_rel_abundance),
+          popup = paste(
+            "Basin:",
+            play_genome()$Basin,
+            "<br>",
+            "Play:",
+            play_genome()$Play,
+            "<br>",
+            paste(
+              "Average MAG Relative Abundance:",
+              round(play_genome()$avg_rel_abundance, 2)
+            )
+          )
+        ) %>%
+        addLegend(
+          "bottomright",
+          data = basin_genome(),
+          values = ~ avg_rel_abundance,
+          pal = pal_noNA(),
+          #pal = pal_genome_basin(),
+          title = "Average MAG <br/> Relative Abundance"
+        ) 
+        
+    }
+    
+  })
+  
+  ## genome table ------
+  output$genome_table <- DT::renderDataTable(taxa_mod(),
+                                             options = list(paging = FALSE))
   
   
 }

@@ -743,7 +743,7 @@ server <- function(input, output, session) {
   # reactive polygon layer based on filtered taxa
   basin_genome <- reactive({
     taxa_mod() %>% 
-      group_by(Basin, domain, phylum, class, order, family, genus, species) %>% 
+      group_by(Basin, domain, phylum, class, order, family, genus) %>% 
       summarise(max_rel_abundance = max(rel_abundance)) %>% 
       group_by(Basin) %>% 
       summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
@@ -754,7 +754,7 @@ server <- function(input, output, session) {
   
   play_genome <- reactive({
     taxa_mod() %>% 
-      group_by(Basin, Play, domain, phylum, class, order, family, genus, species) %>% 
+      group_by(Basin, Play, domain, phylum, class, order, family, genus) %>% 
       summarise(max_rel_abundance = max(rel_abundance)) %>% 
       group_by(Basin, Play) %>% 
       summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 

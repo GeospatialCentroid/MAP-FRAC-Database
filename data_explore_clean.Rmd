@@ -153,11 +153,13 @@ genome_app <- genome_joined %>%
 
 # basins 
 genome_app %>% 
-  group_by(Basin, domain, phylum, class, order, family, genus, species) %>% 
+  filter(genus == "Thermotoga") %>% 
+  group_by(Basin, domain, phylum, class, order, family, genus) %>% 
   summarise(max_rel_abundance = max(rel_abundance)) %>% 
   group_by(Basin) %>% 
   summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
   right_join(sediment_basin, by = c("Basin" = "NAME")) %>%
+  View()
   # create column for pop up
   # mutate(popup = paste(
   #           "Basin:",
@@ -167,8 +169,8 @@ genome_app %>%
   #             round(basin_genome()$avg_rel_abundance, 2)
   #           
   #           )) %>% 
-  st_as_sf() %>% 
-  View()
+  # st_as_sf() %>% 
+  # View()
 
 # plays
 genome_app %>% 

@@ -139,6 +139,16 @@ ui <- fluidPage(
         # layout_sidebar(
         #   open = TRUE,
           sidebar = sidebar(position = "left",
+                            selectizeInput("max_abun_group",
+                                           "Choose taxonomic level to summarize relative abundances by:",
+                                           choices = c("Domain" = "domain",
+                                                       "Phylum" = "phylum",
+                                                       "Class" = "class",
+                                                       "Order" = "order",
+                                                       "Familiy" = "family",
+                                                       "Genus" = "genus",
+                                                       "Species" = "species"),
+                                           selected = "genus"),
                             accordion(
                               open = FALSE,
                               accordion_panel(
@@ -157,7 +167,10 @@ ui <- fluidPage(
                                   )
                                 )
                               )
-                            )
+                            ),
+                            em("Disclaimer: Values shown on the map represent the maximum relative abundance value 
+                               for each taxa (taxonomic level to summarize by selected by user abover) averaged within
+                               each basin/play.")
           ),
         nav_panel("MAG Relative Abundance",
                   leafletOutput("genome_map", height = "100%")),
@@ -743,18 +756,18 @@ server <- function(input, output, session) {
   # reactive polygon layer based on filtered taxa
   basin_genome <- reactive({
     taxa_mod() %>% 
-      group_by(Basin, domain, phylum, class, order, family, genus) %>% 
+      group_by(Basin, !!sym(input$max_abun_group)) %>% 
       summarise(max_rel_abundance = max(rel_abundance)) %>% 
       group_by(Basin) %>% 
       summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
-      right_join(sediment_basin, by = c("Basin" = "NAME")) %>% 
+      inner_join(sediment_basin, by = c("Basin" = "NAME")) %>% 
       st_as_sf()
   })
   
   
   play_genome <- reactive({
     taxa_mod() %>% 
-      group_by(Basin, Play, domain, phylum, class, order, family, genus) %>% 
+      group_by(Basin, Play, !!sym(input$max_abun_group)) %>% 
       summarise(max_rel_abundance = max(rel_abundance)) %>% 
       group_by(Basin, Play) %>% 
       summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 

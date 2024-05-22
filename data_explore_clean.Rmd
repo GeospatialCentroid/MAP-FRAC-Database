@@ -154,7 +154,7 @@ genome_app <- genome_joined %>%
 # basins 
 genome_app %>% 
   filter(genus == "Thermotoga") %>% 
-  group_by(Basin, domain, phylum, class, order, family, genus) %>% 
+  group_by(Basin, species) %>% 
   summarise(max_rel_abundance = max(rel_abundance)) %>% 
   group_by(Basin) %>% 
   summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 

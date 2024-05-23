@@ -274,3 +274,51 @@ subplot(fig_1, fig_2, nrows = 1, shareY = TRUE, margin = 0.02) %>%
          xaxis2 = list(range = c(4500, 5000)))
   
 ```
+
+## Well Area Plots
+
+```{r}
+# read in data
+load("data/app_data_Update.RData")
+
+# function to create and save all plots
+area_plot <- function(x, data) {
+  data %>%
+    filter(well_id == x) %>%
+    ggplot(aes(x = days_since_frack, y = value, fill = group)) +
+    geom_area() +
+    scale_fill_manual(
+      values = c("#de3064", "#077969", "#1052ba"),
+      name = "Type",
+      labels = c("Acetate Producers", "Methanogens", "Sulfide Producers")
+    ) +
+    theme_minimal() +
+    labs(y = "% Relative Abundance", x = "Day")+
+    theme(text=element_text(size = 16))
+  
+  ggsave(
+    paste0("www/", x, "_area_plot.png"),
+    width = 6,
+    height = 4,
+    dpi = 300,
+    units = "in"
+  )
+  
+}
+
+
+# arrange/clean well data
+plot_data <- sample_app %>%
+  st_drop_geometry() %>%
+  select(well_id, days_since_frack, contains("perc")) %>%
+  pivot_longer(cols = contains("perc"), names_to = "group")
+
+
+# create and save plot for each well
+walk(unique(plot_data$well_id), area_plot, plot_data)
+
+
+area_plot("AND-1", plot_data)
+
+ggsave("test_area_plot.png", width = 6, height = 4, dpi = 300, units = "in")
+```

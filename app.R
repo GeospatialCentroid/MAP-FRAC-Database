@@ -561,7 +561,10 @@ server <- function(input, output, session) {
                    "-",
                    sample_filtered()$max_days_since_frack
                  )
-               )
+               ),
+               '<img src=', paste0(sample_filtered()$well_id, "_area_plot.png"),
+               ' width="300"',
+               '>'
              )
            } else {
              paste(
@@ -598,7 +601,10 @@ server <- function(input, output, session) {
                paste(
                  "Percent Methanogens:",
                  round(sample_filtered()$perc_methanogens)
-               )
+               ),
+               # '<img src=', paste0(sample_filtered()$well_id, "_area_plot.png"),
+               # ' width="300"',
+               # '>'
              )
            }
          ) %>%

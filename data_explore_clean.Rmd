@@ -125,7 +125,9 @@ sample_app <- sample_app %>%
   filter(sample_type != "input")
 ```
 
-## Genome Explorer Data
+## Genome Explorer Data 
+
+### Relative abudance data
 
 Tie abundance data to genome data
 
@@ -204,6 +206,28 @@ genome_app %>%
 #   group_by(Basin) %>% 
 #   summarise(n_MAG_samples = n())
   
+```
+
+### Core Data
+
+```{r}
+# read in core files
+core_70 <- readxl::read_xlsx("data/core_70perc.xlsx")
+
+core_all <- readxl::read_xlsx("data/core_ALL.xlsx")
+
+# prep for app
+
+## basins
+core_all %>% 
+  filter(perc_samples_present_per_basin >= 0.50) %>% 
+  group_by(basin) %>% 
+  count() %>% 
+  # join to shapefile
+  right_join(sediment_basin, by = c("basin" = "NAME")) %>% 
+  st_as_sf()
+
+
 ```
 
 ## Save data for app

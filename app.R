@@ -293,7 +293,7 @@ ui <- fluidPage(
         nav_panel("MAG Relative Abundance",
                   leafletOutput("genome_map", height = "100%")),
         nav_panel("MAG Cores",
-                  leafletOutput("cores_map"))
+                  leafletOutput("cores_map", height = "100%"))
 
           
           ),
@@ -915,6 +915,92 @@ server <- function(input, output, session) {
   })
   
   ### MAG Cores ------
+  
+  cores_genome <- reactive({mag_cores %>% 
+    filter(perc_samples_present_per_basin >= input$core_cutoff) %>% 
+    group_by(basin) %>% 
+    count() %>% 
+    # join to shapefile
+    inner_join(sediment_basin, by = c("basin" = "NAME")) %>% 
+    st_as_sf()
+  })
+  
+  ## cores color palette
+  pal_cores <- reactive({
+    colorNumeric(
+      palette = c('#2cb2ba', '#94b674', '#fbb92d'),
+      domain = cores_genome()$n
+    )
+  })
+  
+  # pull basin bounds for default view
+  bbox <- st_bbox(sediment_basin) %>% as.vector()
+  
+  output$cores_map <- leaflet::renderLeaflet({
+    leaflet() %>%
+      fitBounds(bbox[1], bbox[2], bbox[3], bbox[4]) %>% 
+      addProviderTiles("OpenStreetMap") %>%
+      # addMapPane("Basins", zIndex = 410) %>%
+      # addMapPane("Plays", zIndex = 420) %>%
+      addScaleBar(position = "bottomright") %>%
+      addLayersControl(
+        position = "bottomleft",
+        overlayGroups = c("Basins"),
+        options = layersControlOptions(collapsed = FALSE)
+      )
+  })
+  
+  observe({
+    
+    input$nav_genome
+    
+    leafletProxy('cores_map') %>%
+      clearGroup("Basins") %>%
+      clearControls() %>%
+      addPolygons(
+        group = "Basins",
+        data = cores_genome(),
+        stroke = FALSE,
+        fillOpacity = 0.65,
+        fillColor = ~ pal_cores()(n),
+        popup = paste(
+          "Basin:",
+          cores_genome()$basin,
+          "<br>",
+          "Number of MAG Cores:",
+          cores_genome()$n
+        )
+      ) %>%
+      # addPolygons(
+      #   group = "Plays",
+      #   data = play_genome(),
+      #   stroke = FALSE,
+      #   fillOpacity = 0.85,
+      #   fillColor = ~ pal_genome_play()(avg_rel_abundance),
+      #   popup = paste(
+      #     "Basin:",
+      #     play_genome()$Basin,
+      #     "<br>",
+      #     "Play:",
+      #     play_genome()$Play,
+      #     "<br>",
+      #     paste(
+      #       "Average MAG Relative Abundance:",
+      #       round(play_genome()$avg_rel_abundance, 2)
+      #     )
+      #   )
+      # ) %>%
+      addLegend(
+        "bottomright",
+        data = cores_genome(),
+        values = ~ n,
+        pal = pal_cores(),
+        title = "Number of <br/> MAG Cores"
+      ) 
+    
+    
+  })
+  
   
   ## genome table ------
   output$genome_table <- DT::renderDataTable(taxa_mod(),

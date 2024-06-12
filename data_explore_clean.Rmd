@@ -22,7 +22,7 @@ genome <- read_xlsx("data/GENOME_geospatial_metadata.xlsx")
 
 mag_abundance <- read_xlsx("data/MAGs_average_relativeabund_by_basin.xlsx")
 
-
+mag_cores <- readxl::read_xlsx("data/core_ALL.xlsx")
 # Basins and Plays
 
 # Downloaded from here: https://atlas.eia.gov/search?q=plays&source=u.s.%2520energy%2520information%2520administration
@@ -211,30 +211,28 @@ genome_app %>%
 ### Core Data
 
 ```{r}
-# read in core files
-core_70 <- readxl::read_xlsx("data/core_70perc.xlsx")
-
-core_all <- readxl::read_xlsx("data/core_ALL.xlsx")
 
 # prep for app
 
 ## basins
-core_all %>% 
+core_app <- mag_cores %>% 
   filter(perc_samples_present_per_basin >= 0.50) %>% 
   group_by(basin) %>% 
   count() %>% 
   # join to shapefile
-  right_join(sediment_basin, by = c("basin" = "NAME")) %>% 
+  inner_join(sediment_basin, by = c("basin" = "NAME")) %>% 
   st_as_sf()
 
 
+mapview(core_app)
 ```
+
 
 ## Save data for app
 
 ```{r}
 #save updated data
-save(sample_app, sample_inputs, play_basin, sediment_basin, genome_app, file = "data/app_data_Update.RData")
+save(sample_app, sample_inputs, play_basin, sediment_basin, genome_app, mag_cores, file = "data/app_data_Update.RData")
 
 
 #save(sample_app, genome_app, basin_sample, basin_genome, file = "data/app_data.RData")

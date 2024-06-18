@@ -116,11 +116,108 @@ ui <- fluidPage(
               choices = c("Wells", "Samples"),
               selected = "Wells"
             ),
-            uiOutput("update_panel")
+            conditionalPanel(
+              "input.point_type == 'Wells'",
+              radioGroupButtons(
+                "time_series",
+                "Wells with timeseries sampling:",
+                choices = c("Yes", 'No', "Show All Samples"),
+                selected = "Show All Samples",
+                status = "primary"
+              ),
+              uiOutput("time_selection"),
+              uiOutput("salinity_selection"),
+              conditionalPanel(
+                "input.time_series == 'Yes'",
+                checkboxGroupInput(
+                  "time_category",
+                  "Time Series Stage:",
+                  choiceNames = c("Early (0-100 days)", "Mid (100-365 days", "Late (>365 Days)"),
+                  choiceValues = c("early", "mid", "late"),
+                  selected = c("early", "mid", "late")
+                )
+              ),
+              checkboxGroupInput(
+                "salinity_class",
+                "Salinity Classification:",
+                choiceNames = c("Brine", "High", "Moderate", "Not Measured"),
+                choiceValues = c("brine", "high", "moderate", "N/A"),
+                selected = c("brine", "high", "moderate", "N/A")
+              )
+            ),
+            conditionalPanel(
+              "input.point_type == 'Samples'",
+              selectizeInput(
+                "sample_var_size",
+                "Size Points By:",
+                choices = c(
+                  "Salinity" = "salinity_conductivity_m_s_cm",
+                  "Percent Sulfide Producers" = "perc_sulfide_producers",
+                  "Percent Acetate Producers" = "perc_acetate_producers",
+                  "Percent Methanogens" = "perc_methanogens"
+                ),
+                options = list(
+                  placeholder = 'Please select an option below',
+                  onInitialize = I('function() { this.setValue(""); }')
+                )
+              ),
+              p("Filter Samples:"),
+              sliderInput(
+                "salinity_range",
+                "Salinity (Conductivity in mS/cm)",
+                min = min(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE),
+                max = round(max(
+                  sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE
+                )),
+                value = c(
+                  min(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE),
+                  round(max(
+                    sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE
+                  ))
+                )
+              ),
+              sliderInput(
+                "sulfide_range",
+                "Percent Sulfide Producers",
+                min = min(sample_app$perc_sulfide_producers, na.rm = TRUE),
+                max = round(max(
+                  sample_app$perc_sulfide_producers, na.rm = TRUE
+                )),
+                value = c(
+                  min(sample_app$perc_sulfide_producers, na.rm = TRUE),
+                  round(max(
+                    sample_app$perc_sulfide_producers, na.rm = TRUE
+                  ))
+                )
+              ),
+              sliderInput(
+                "acetate_range",
+                "Percent Acetate Producers",
+                min = min(sample_app$perc_acetate_producers, na.rm = TRUE),
+                max = round(max(
+                  sample_app$perc_acetate_producers, na.rm = TRUE
+                )),
+                value = c(
+                  min(sample_app$perc_acetate_producers, na.rm = TRUE),
+                  round(max(
+                    sample_app$perc_acetate_producers, na.rm = TRUE
+                  ))
+                )
+              ),
+              sliderInput(
+                "methanogen_range",
+                "Percent Methanogens",
+                min = min(sample_app$perc_methanogens, na.rm = TRUE),
+                max = round(max(sample_app$perc_methanogens, na.rm = TRUE)),
+                value = c(min(sample_app$perc_methanogens, na.rm = TRUE), round(
+                  max(sample_app$perc_methanogens, na.rm = TRUE)
+                ))
+              )
+            )
           ),
           leafletOutput("sample_map", height = "100%")
         )
-      ),
+      ), 
       card(height = 750,
            #card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
            #card_header(em("De-select basin names from the legend on the right to zoom to certain wells")),
@@ -134,35 +231,69 @@ ui <- fluidPage(
       h4("Placeholder for subheader"),
       navset_card_tab(
         title = "",
+        id = "nav_genome",
         full_screen = TRUE,
         height = 600,
         # layout_sidebar(
         #   open = TRUE,
-          sidebar = sidebar(position = "left",
-                            accordion(
-                              open = FALSE,
-                              accordion_panel(
-                                "Filter by Taxonomy:",
-                                selectizeGroupUI(
-                                  id = "taxonomy_filter",
-                                  inline = FALSE,
-                                  params = list(
-                                    domain = list(inputId = "domain", title = "Domain:"),
-                                    phylum = list(inputId = "phylum", title = "Phylum:"),
-                                    class = list(inputId = "class", title = "Class:"),
-                                    order = list(inputId = "order", title = "Order:"),
-                                    family = list(inputId = "family", title = "Family:"),
-                                    genus = list(inputId = "genus", title = "Genus:"),
-                                    species = list(inputId = "species", title = "Species:")
-                                  )
-                                )
-                              )
-                            )
+        sidebar = sidebar(
+          position = "left",
+          conditionalPanel(
+            "input.nav_genome == 'MAG Relative Abundance'",
+            selectizeInput(
+              "max_abun_group",
+              "Choose taxonomic level to summarize relative abundances by:",
+              choices = c(
+                "Domain" = "domain",
+                "Phylum" = "phylum",
+                "Class" = "class",
+                "Order" = "order",
+                "Familiy" = "family",
+                "Genus" = "genus",
+                "Species" = "species"
+              ),
+              selected = "genus"
+            ),
+            accordion(
+              open = FALSE,
+              accordion_panel(
+                "Filter by Taxonomy:",
+                selectizeGroupUI(
+                  id = "taxonomy_filter",
+                  inline = FALSE,
+                  params = list(
+                    domain = list(inputId = "domain", title = "Domain:"),
+                    phylum = list(inputId = "phylum", title = "Phylum:"),
+                    class = list(inputId = "class", title = "Class:"),
+                    order = list(inputId = "order", title = "Order:"),
+                    family = list(inputId = "family", title = "Family:"),
+                    genus = list(inputId = "genus", title = "Genus:"),
+                    species = list(inputId = "species", title = "Species:")
+                  )
+                )
+              )
+            ),
+            em(
+              "Disclaimer: Values shown on the map represent the maximum relative abundance value
+                               for each taxa (taxonomic level to summarize by selected by user abover) averaged within
+                               each basin/play."
+            )
           ),
+          conditionalPanel(
+            "input.nav_genome == 'MAG Cores'",
+            radioGroupButtons(
+              "core_cutoff",
+              "Core MAGS defined as:",
+              choiceNames = c(">50% of samples per basin", ">70% of samples per basin"),
+              choiceValues = c(0.5, 0.7),
+              status = "primary"
+            )
+          )
+        ), 
         nav_panel("MAG Relative Abundance",
                   leafletOutput("genome_map", height = "100%")),
         nav_panel("MAG Cores",
-                  leafletOutput("cores_map"))
+                  leafletOutput("cores_map", height = "100%"))
 
           
           ),
@@ -176,96 +307,6 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   
 
-  
-  ## update UI based on point type selection -------------
-  output$update_panel <- renderUI({
-    if (input$point_type == "Wells") {
-      wellPanel(
-        radioGroupButtons(
-          "time_series",
-          "Wells with timeseries sampling:",
-          choices = c("Yes", 'No', "Show All Samples"),
-          selected = "Show All Samples",
-          status = "primary"
-        ),
-        uiOutput("time_selection"),
-        uiOutput("salinity_selection")
-      )
-    } else {
-      wellPanel(
-        selectizeInput("sample_var_size",
-                    "Size Points By:",
-                    choices = c("Salinity" = "salinity_conductivity_m_s_cm",
-                                "Percent Sulfide Producers" = "perc_sulfide_producers",
-                                "Percent Acetate Producers" = "perc_acetate_producers",
-                                "Percent Methanogens" = "perc_methanogens"),
-                    options = list(
-                      placeholder = 'Please select an option below',
-                      onInitialize = I('function() { this.setValue(""); }')
-                    )),
-        p("Filter Samples:"),
-        sliderInput("salinity_range","Salinity (Conductivity in mS/cm)",
-                    min = min(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE),
-                    max = round(max(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE)),
-                    value = c(min(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE), 
-                              round(max(sample_app$salinity_conductivity_m_s_cm, na.rm = TRUE)))),
-        sliderInput("sulfide_range","Percent Sulfide Producers",
-                    min = min(sample_app$perc_sulfide_producers, na.rm = TRUE),
-                    max = round(max(sample_app$perc_sulfide_producers, na.rm = TRUE)),
-                    value = c(min(sample_app$perc_sulfide_producers, na.rm = TRUE), 
-                              round(max(sample_app$perc_sulfide_producers, na.rm = TRUE)))),
-        sliderInput("acetate_range","Percent Acetate Producers",
-                    min = min(sample_app$perc_acetate_producers, na.rm = TRUE),
-                    max = round(max(sample_app$perc_acetate_producers, na.rm = TRUE)),
-                    value = c(min(sample_app$perc_acetate_producers, na.rm = TRUE), 
-                              round(max(sample_app$perc_acetate_producers, na.rm = TRUE)))),
-        sliderInput("methanogen_range","Percent Methanogens",
-                    min = min(sample_app$perc_methanogens, na.rm = TRUE),
-                    max = round(max(sample_app$perc_methanogens, na.rm = TRUE)),
-                    value = c(min(sample_app$perc_methanogens, na.rm = TRUE), 
-                              round(max(sample_app$perc_methanogens, na.rm = TRUE))))
-      )
-    }
-  })
-  
-  # time selection
-    output$time_selection <- renderUI({
-      #validate(need(!is.null(input$time_series), "Please select a time series option."))
-      if (input$time_series == "Yes") {
-        checkboxGroupInput(
-          "time_category",
-          "Time Series Stage:",
-          choiceNames = c(
-            "Early (0-100 days)",
-            "Mid (100-365 days",
-            "Late (>365 Days)"
-          ),
-          choiceValues = c("early", "mid", "late"),
-          selected = c("early", "mid", "late")
-        )
-      } else {
-        p("")
-      }
-
-   })
-    
-    output$salinity_selection <- renderUI({
-      checkboxGroupInput(
-        "salinity_class",
-        "Salinity Classification:",
-        choiceNames = c(
-          "Brine",
-          "High",
-          "Moderate",
-          "Not Measured"
-        ),
-        choiceValues = c("brine", "high", "moderate", "N/A"),
-        selected = c("brine", "high", "moderate", "N/A")
-      )
-    })
-    
-    
-  
   ## reactive sample data -----------
   
    sample_filtered <- reactive({
@@ -548,7 +589,10 @@ server <- function(input, output, session) {
                    "-",
                    sample_filtered()$max_days_since_frack
                  )
-               )
+               ),
+               '<img src=', paste0(sample_filtered()$well_id, "_area_plot.png"),
+               ' width="300"',
+               '>'
              )
            } else {
              paste(
@@ -586,6 +630,9 @@ server <- function(input, output, session) {
                  "Percent Methanogens:",
                  round(sample_filtered()$perc_methanogens)
                )
+               # '<img src=', paste0(sample_filtered()$well_id, "_area_plot.png"),
+               # ' width="300"',
+               # '>'
              )
            }
          ) %>%
@@ -595,7 +642,11 @@ server <- function(input, output, session) {
            radius = if (input$point_type == "Wells") {
              ~ sqrt(n_samples) * 3
            } else {
-             ~ salinity_conductivity_m_s_cm / 12
+             if (input$sample_var_size == "") {
+               6
+             } else {
+               ~ sqrt(sample_jitter1()[[input$sample_var_size]])
+             }
            },
            #radius = ~ sqrt(n_samples) * 3,
            stroke = TRUE,
@@ -739,22 +790,24 @@ server <- function(input, output, session) {
   )
   
   ## genome map -----
+   
+   ### MAG Relative Abundance ------
   
   # reactive polygon layer based on filtered taxa
   basin_genome <- reactive({
     taxa_mod() %>% 
-      group_by(Basin, domain, phylum, class, order, family, genus, species) %>% 
+      group_by(Basin, !!sym(input$max_abun_group)) %>% 
       summarise(max_rel_abundance = max(rel_abundance)) %>% 
       group_by(Basin) %>% 
       summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
-      right_join(sediment_basin, by = c("Basin" = "NAME")) %>% 
+      inner_join(sediment_basin, by = c("Basin" = "NAME")) %>% 
       st_as_sf()
   })
   
   
   play_genome <- reactive({
     taxa_mod() %>% 
-      group_by(Basin, Play, domain, phylum, class, order, family, genus, species) %>% 
+      group_by(Basin, Play, !!sym(input$max_abun_group)) %>% 
       summarise(max_rel_abundance = max(rel_abundance)) %>% 
       group_by(Basin, Play) %>% 
       summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
@@ -860,6 +913,94 @@ server <- function(input, output, session) {
     }
     
   })
+  
+  ### MAG Cores ------
+  
+  cores_genome <- reactive({mag_cores %>% 
+    filter(perc_samples_present_per_basin >= input$core_cutoff) %>% 
+    group_by(basin) %>% 
+    count() %>% 
+    # join to shapefile
+    inner_join(sediment_basin, by = c("basin" = "NAME")) %>% 
+    st_as_sf()
+  })
+  
+  ## cores color palette
+  pal_cores <- reactive({
+    colorNumeric(
+      palette = c('#2cb2ba', '#94b674', '#fbb92d'),
+      domain = cores_genome()$n
+    )
+  })
+  
+  # pull basin bounds for default view
+  bbox <- st_bbox(sediment_basin) %>% as.vector()
+  
+  output$cores_map <- leaflet::renderLeaflet({
+    leaflet() %>%
+      fitBounds(bbox[1], bbox[2], bbox[3], bbox[4]) %>% 
+      addProviderTiles("OpenStreetMap") %>%
+      # addMapPane("Basins", zIndex = 410) %>%
+      # addMapPane("Plays", zIndex = 420) %>%
+      addScaleBar(position = "bottomright") %>%
+      addLayersControl(
+        position = "bottomleft",
+        overlayGroups = c("Basins"),
+        options = layersControlOptions(collapsed = FALSE)
+      )
+  })
+  
+  observe({
+    
+    input$nav_genome
+    
+    leafletProxy('cores_map') %>%
+      clearGroup("Basins") %>%
+      clearControls() %>%
+      addPolygons(
+        group = "Basins",
+        data = cores_genome(),
+        stroke = FALSE,
+        fillOpacity = 0.65,
+        fillColor = ~ pal_cores()(n),
+        popup = paste(
+          "Basin:",
+          cores_genome()$basin,
+          "<br>",
+          "Number of MAG Cores:",
+          cores_genome()$n
+        )
+      ) %>%
+      # addPolygons(
+      #   group = "Plays",
+      #   data = play_genome(),
+      #   stroke = FALSE,
+      #   fillOpacity = 0.85,
+      #   fillColor = ~ pal_genome_play()(avg_rel_abundance),
+      #   popup = paste(
+      #     "Basin:",
+      #     play_genome()$Basin,
+      #     "<br>",
+      #     "Play:",
+      #     play_genome()$Play,
+      #     "<br>",
+      #     paste(
+      #       "Average MAG Relative Abundance:",
+      #       round(play_genome()$avg_rel_abundance, 2)
+      #     )
+      #   )
+      # ) %>%
+      addLegend(
+        "bottomright",
+        data = cores_genome(),
+        values = ~ n,
+        pal = pal_cores(),
+        title = "Number of <br/> MAG Cores"
+      ) 
+    
+    
+  })
+  
   
   ## genome table ------
   output$genome_table <- DT::renderDataTable(taxa_mod(),

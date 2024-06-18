@@ -22,7 +22,7 @@ genome <- read_xlsx("data/GENOME_geospatial_metadata.xlsx")
 
 mag_abundance <- read_xlsx("data/MAGs_average_relativeabund_by_basin.xlsx")
 
-
+mag_cores <- readxl::read_xlsx("data/core_ALL.xlsx")
 # Basins and Plays
 
 # Downloaded from here: https://atlas.eia.gov/search?q=plays&source=u.s.%2520energy%2520information%2520administration
@@ -125,7 +125,9 @@ sample_app <- sample_app %>%
   filter(sample_type != "input")
 ```
 
-## Genome Explorer Data
+## Genome Explorer Data 
+
+### Relative abudance data
 
 Tie abundance data to genome data
 
@@ -153,11 +155,13 @@ genome_app <- genome_joined %>%
 
 # basins 
 genome_app %>% 
-  group_by(Basin, domain, phylum, class, order, family, genus, species) %>% 
+  filter(genus == "Thermotoga") %>% 
+  group_by(Basin, species) %>% 
   summarise(max_rel_abundance = max(rel_abundance)) %>% 
   group_by(Basin) %>% 
   summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
   right_join(sediment_basin, by = c("Basin" = "NAME")) %>%
+  View()
   # create column for pop up
   # mutate(popup = paste(
   #           "Basin:",
@@ -167,8 +171,8 @@ genome_app %>%
   #             round(basin_genome()$avg_rel_abundance, 2)
   #           
   #           )) %>% 
-  st_as_sf() %>% 
-  View()
+  # st_as_sf() %>% 
+  # View()
 
 # plays
 genome_app %>% 
@@ -204,11 +208,31 @@ genome_app %>%
   
 ```
 
+### Core Data
+
+```{r}
+
+# prep for app
+
+## basins
+core_app <- mag_cores %>% 
+  filter(perc_samples_present_per_basin >= 0.50) %>% 
+  group_by(basin) %>% 
+  count() %>% 
+  # join to shapefile
+  inner_join(sediment_basin, by = c("basin" = "NAME")) %>% 
+  st_as_sf()
+
+
+mapview(core_app)
+```
+
+
 ## Save data for app
 
 ```{r}
 #save updated data
-save(sample_app, sample_inputs, play_basin, sediment_basin, genome_app, file = "data/app_data_Update.RData")
+save(sample_app, sample_inputs, play_basin, sediment_basin, genome_app, mag_cores, file = "data/app_data_Update.RData")
 
 
 #save(sample_app, genome_app, basin_sample, basin_genome, file = "data/app_data.RData")
@@ -271,4 +295,52 @@ subplot(fig_1, fig_2, nrows = 1, shareY = TRUE, margin = 0.02) %>%
   layout(xaxis = list(range = c(0, 2500)),
          xaxis2 = list(range = c(4500, 5000)))
   
+```
+
+## Well Area Plots
+
+```{r}
+# read in data
+load("data/app_data_Update.RData")
+
+# function to create and save all plots
+area_plot <- function(x, data) {
+  data %>%
+    filter(well_id == x) %>%
+    ggplot(aes(x = days_since_frack, y = value, fill = group)) +
+    geom_area() +
+    scale_fill_manual(
+      values = c("#de3064", "#077969", "#1052ba"),
+      name = "Type",
+      labels = c("Acetate Producers", "Methanogens", "Sulfide Producers")
+    ) +
+    theme_minimal() +
+    labs(y = "% Relative Abundance", x = "Day")+
+    theme(text=element_text(size = 16))
+  
+  ggsave(
+    paste0("www/", x, "_area_plot.png"),
+    width = 6,
+    height = 4,
+    dpi = 300,
+    units = "in"
+  )
+  
+}
+
+
+# arrange/clean well data
+plot_data <- sample_app %>%
+  st_drop_geometry() %>%
+  select(well_id, days_since_frack, contains("perc")) %>%
+  pivot_longer(cols = contains("perc"), names_to = "group")
+
+
+# create and save plot for each well
+walk(unique(plot_data$well_id), area_plot, plot_data)
+
+
+area_plot("AND-1", plot_data)
+
+ggsave("test_area_plot.png", width = 6, height = 4, dpi = 300, units = "in")
 ```

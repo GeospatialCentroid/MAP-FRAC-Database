@@ -307,7 +307,7 @@ ui <- fluidPage(
     
     ## Tool -----------
     tabPanel(
-      "Tool",
+      "MAG Matching Tool",
       card(fileInput("data_upload", "Upload 16S .txt file:", accept = ".txt"),
            tableOutput("data_preview"))
     )
@@ -1027,6 +1027,24 @@ server <- function(input, output, session) {
                                               options = list(paging = FALSE))
     
     
+  })
+  
+  
+  # Tool -------------------------
+  
+  user_data <- reactive({
+    req(input$data_upload)
+    
+    ext <- tools::file_ext(input$data_upload$name)
+    
+    validate(need(ext == "txt", "Invalid file; please upload a .txt file."))
+    
+    read.delim(input$data_upload$datapath, header = TRUE, skip = 1)
+
+  })
+  
+  output$data_preview <- renderTable({
+    head(user_data())
   })
   
   

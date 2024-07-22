@@ -233,7 +233,7 @@ ui <- fluidPage(
         title = "",
         id = "nav_genome",
         full_screen = TRUE,
-        height = 600,
+        #height = 1000,
         # layout_sidebar(
         #   open = TRUE,
         sidebar = sidebar(
@@ -254,6 +254,7 @@ ui <- fluidPage(
               ),
               selected = "genus"
             ),
+            br(),
             accordion(
               open = FALSE,
               accordion_panel(
@@ -273,6 +274,7 @@ ui <- fluidPage(
                 )
               )
             ),
+            hr(),
             em(
               "Disclaimer: Values shown on the map represent the maximum relative abundance value
                                for each taxa (taxonomic level to summarize by selected by user abover) averaged within
@@ -291,14 +293,23 @@ ui <- fluidPage(
           )
         ), 
         nav_panel("MAG Relative Abundance",
-                  leafletOutput("genome_map", height = "100%")),
+                  card(height = 600, leafletOutput("genome_map", height = "100%")),
+                  card(DT::dataTableOutput("abundance_table"))),
         nav_panel("MAG Cores",
-                  leafletOutput("cores_map", height = "100%"))
+                  card(height = 600, leafletOutput("cores_map", height = "100%")),
+                  card(DT::dataTableOutput("cores_table")))
 
           
           ),
-      card(height = 600, DT::dataTableOutput("genome_table"))
+     
       
+    ),
+    
+    ## Tool -----------
+    tabPanel(
+      "Tool",
+      card(fileInput("data_upload", "Upload 16S .txt file:", accept = ".txt"),
+           tableOutput("data_preview"))
     )
   )
 )
@@ -466,7 +477,7 @@ server <- function(input, output, session) {
   })
   
   
-  ## sample map ----
+  ## Sample Map ----
   output$sample_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
@@ -766,30 +777,32 @@ server <- function(input, output, session) {
   })
    
    
-   ## sample table ------
+   ### sample table ------
    output$sample_table <- DT::renderDataTable(st_drop_geometry(sample_app),
                                               options = list(paging = FALSE))
    
 
-  # genome filter ----------------
-  taxa_mod <- callModule(
-    module = selectizeGroupServer,
-    id = "taxonomy_filter",
-    inline = FALSE,
-    # for now filter out international basins
-    data = filter(genome_app, !Basin %in% c("Sichuan", "Western Canadian", "Bowland Shale")),
-    vars = c(
-      "domain",
-      "phylum",
-      "class",
-      "order",
-      "family",
-      "genus",
-      "species"
-    )
-  )
+ 
   
-  ## genome map -----
+  ## Genome Map -----
+   
+   ### genome filter ----------------
+   taxa_mod <- callModule(
+     module = selectizeGroupServer,
+     id = "taxonomy_filter",
+     inline = FALSE,
+     # for now filter out international basins
+     data = filter(genome_app, !Basin %in% c("Sichuan", "Western Canadian", "Bowland Shale")),
+     vars = c(
+       "domain",
+       "phylum",
+       "class",
+       "order",
+       "family",
+       "genus",
+       "species"
+     )
+   )
    
    ### MAG Relative Abundance ------
   
@@ -914,9 +927,14 @@ server <- function(input, output, session) {
     
   })
   
+  #### abundance table ------
+  output$abundance_table <- DT::renderDataTable(taxa_mod(),
+                                                options = list(paging = FALSE))
+  
   ### MAG Cores ------
   
-  cores_genome <- reactive({mag_cores %>% 
+  #### data for map
+  cores_map <- reactive({mag_cores %>% 
     filter(perc_samples_present_per_basin >= input$core_cutoff) %>% 
     group_by(basin) %>% 
     count() %>% 
@@ -925,11 +943,17 @@ server <- function(input, output, session) {
     st_as_sf()
   })
   
+  #### data for table
+  cores_table <- reactive({
+    mag_cores %>%
+      filter(perc_samples_present_per_basin >= input$core_cutoff)
+  })
+  
   ## cores color palette
   pal_cores <- reactive({
     colorNumeric(
       palette = c('#2cb2ba', '#94b674', '#fbb92d'),
-      domain = cores_genome()$n
+      domain = cores_map()$n
     )
   })
   
@@ -959,16 +983,16 @@ server <- function(input, output, session) {
       clearControls() %>%
       addPolygons(
         group = "Basins",
-        data = cores_genome(),
+        data = cores_map(),
         stroke = FALSE,
         fillOpacity = 0.65,
         fillColor = ~ pal_cores()(n),
         popup = paste(
           "Basin:",
-          cores_genome()$basin,
+          cores_map()$basin,
           "<br>",
           "Number of MAG Cores:",
-          cores_genome()$n
+          cores_map()$n
         )
       ) %>%
       # addPolygons(
@@ -992,19 +1016,18 @@ server <- function(input, output, session) {
       # ) %>%
       addLegend(
         "bottomright",
-        data = cores_genome(),
+        data = cores_map(),
         values = ~ n,
         pal = pal_cores(),
         title = "Number of <br/> MAG Cores"
       ) 
     
+    #### cores table ------
+    output$cores_table <- DT::renderDataTable(cores_table(),
+                                              options = list(paging = FALSE))
+    
     
   })
-  
-  
-  ## genome table ------
-  output$genome_table <- DT::renderDataTable(taxa_mod(),
-                                             options = list(paging = FALSE))
   
   
 }

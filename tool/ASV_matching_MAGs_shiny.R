@@ -2,75 +2,42 @@
 library(tidyverse)
 library(ggplot2)
 
-setwd("/Users/kkamundson/Library/Mobile Documents/com~apple~CloudDocs/Documents/csu/projects/shale_biogeo_project/tool_creation/iteration1")
-
 #### READ IN FILES ####
 # read in MAG table - this will always be the same (unless updated in the future by me)
-mags <- read.delim("shale_MAGs_978.txt", header = TRUE)
+mags <- read.delim("tool/shale_MAGs_978.txt", header = TRUE)
 
 # read in user feature table 
-feat <- read.delim("feature_table_w_tax.txt", header = TRUE, skip = 1)
+feat <- read.delim("tool/feature_table_w_tax.txt", header = TRUE, skip = 1)
 
 
 ################ FORMAT MAG TABLE ##############################################
 # This is truncating the MAG tax string at different levels for a 'lookup' later on 
 # Technically only needs to be done once per environment load 
-# GENUS - truncate taxonomic string for genus level 
 mags <- mags %>%
-  mutate(MAG_genus = sub("(;s__.*)$", "", MAG_FULL_tax))
-
-# FAMILY - truncate the taxonomy string 
-mags <- mags %>%
-  mutate(MAG_family = sub("(;g__.*)$", "", MAG_FULL_tax))
-
-# ORDER - truncate the taxonomy string
-mags <- mags %>%
-  mutate(MAG_order = sub("(;f__.*)$", "", MAG_FULL_tax))
-
-# CLASS - truncate the taxonomy string
-mags <- mags %>%
-  mutate(MAG_class = sub("(;o__.*)$", "", MAG_FULL_tax))
-
-#write.csv(mags, "MAGs_trucated_tax_strings.csv")
-
-
+  mutate(MAG_genus = sub("(;s__.*)$", "", MAG_FULL_tax,),
+         MAG_family = sub("(;g__.*)$", "", MAG_FULL_tax),
+         MAG_order = sub("(;f__.*)$", "", MAG_FULL_tax),
+         MAG_class = sub("(;o__.*)$", "", MAG_FULL_tax))
 
 ################### FORMAT ASV TABLE ###########################################
 # rename the first column (ASVs) as such 
 colnames(feat)[1] <- "ASV"
 
 # extract the columns 'ASV' and 'taxonomy' from the feature table & rename
-taxa <- feat %>% select(ASV, taxonomy)
-taxa <- as.data.frame(taxa)
-colnames(taxa)[2] <- "ASV_FULL_tax"
-
-taxa <- taxa %>%
-  separate(ASV_FULL_tax, into = c("d","p","c","o","f","g","s"), sep = ";", remove = FALSE)
-
-# GENUS - truncate the taxonomy string to everything after 'genus' by removing all species
-taxa <- taxa %>%
-  mutate(ASV_genus = sub("(;s__.*)$", "", ASV_FULL_tax))
-
-# FAMILY - truncate the taxonomy string to family level
-taxa <- taxa %>%
-  mutate(ASV_family = sub("(;g__.*)$", "", ASV_FULL_tax))
-
-# ORDER - truncate the taxonomy string to order level
-taxa <- taxa %>%
-  mutate(ASV_order = sub("(;f__.*)$", "", ASV_FULL_tax))
-
-# CLASS - truncate the taxonomy string to class level
-taxa <- taxa %>%
-  mutate(ASV_class = sub("(;o__.*)$", "", ASV_FULL_tax))
+taxa <- feat %>%
+  select(ASV, "ASV_FULL_tax" = taxonomy) %>%
+  separate(ASV_FULL_tax, into = c("d","p","c","o","f","g","s"), sep = ";", remove = FALSE) %>% 
+  #truncate the taxonomy strings to everything after 'genus' by removing all species and all other levels
+  mutate(ASV_genus = sub("(;s__.*)$", "", ASV_FULL_tax),
+         ASV_family = sub("(;g__.*)$", "", ASV_FULL_tax),
+         ASV_order = sub("(;f__.*)$", "", ASV_FULL_tax),
+         ASV_class = sub("(;o__.*)$", "", ASV_FULL_tax))
 
 # CHECK - count total number of rows in taxa and input 'feat' and checking that they match 
-nrow(taxa)
-nrow(feat)
+# nrow(taxa) == nrow(feat)
 
 # SAVE - count the total number of ASVs in a feature table
 TOTAL_FEAT <- nrow(feat)
-
-#write.csv(taxa, "taxa_out_test.csv")
 
 
 ################################################################################
@@ -118,10 +85,12 @@ MAGs_unique_FULL <- nrow(mags_filtered_FULL)
 na_rows_full <- merged_data %>% filter(is.na(match_level))
 
 # left join to look up MAG for matching full classificaiton between ASV and MAG
-merged_data_full <- left_join(na_rows_full, mags_filtered_FULL %>% select(MAG_FULL_tax, MAG), by = c("ASV_FULL_tax" = "MAG_FULL_tax"))
-
-# Add a new column based on condition
-merged_data_full <- merged_data_full %>%
+merged_data_full <- left_join(
+  na_rows_full,
+  select(mags_filtered_FULL, MAG_FULL_tax, MAG),
+  by = c("ASV_FULL_tax" = "MAG_FULL_tax")
+) %>%
+  # Add a new column based on condition
   mutate(match_level = ifelse(!is.na(MAG), "full tax", NA))
 
 # Combine with original dataset
@@ -129,7 +98,7 @@ merged_data <- bind_rows(merged_data %>% filter(!is.na(match_level)), merged_dat
 
 # CHECK SOME NUMBERS !
 ## First - merged_data should be the same as 'feat' 
-nrow(merged_data)
+#nrow(merged_data) == nrow(feat)
 
 # Second - how many ASVs match at the full taxanomic string match level?
 count_ASV_FULL <- sum(merged_data$match_level == "full tax", na.rm = TRUE)
@@ -154,26 +123,23 @@ MAGs_unique_GENUS <- nrow(mags_filtered_GENUS)
 na_rows_genus <- merged_data %>% filter(is.na(match_level))
 
 # Left join on filtered rows
-merged_data_genus <- left_join(na_rows_genus, mags_filtered_GENUS %>% select(MAG_genus, MAG), by = c("ASV_genus" = "MAG_genus"))
-
-# Need to rename the column due to the default naming
-merged_data_genus <- merged_data_genus %>%
-  rename(MAG = MAG.y)
-
-# Fill in new_column with 'genus' for newly added rows
-merged_data_genus <- merged_data_genus %>%
+merged_data_genus <- left_join(
+  na_rows_genus,
+  select(mags_filtered_GENUS, MAG_genus, MAG),
+  by = c("ASV_genus" = "MAG_genus")
+) %>% 
+  rename(MAG = MAG.y) %>% 
+  # Fill in new_column with 'genus' for newly added rows
   mutate(match_level = ifelse(!is.na(MAG), "genus", NA))
 
 # Combine original merged_data with new_merged_data
-merged_data <- bind_rows(merged_data %>% filter(!is.na(match_level)), merged_data_genus)
-
-# Need to remove random MAG.x column it makes
-merged_data <- merged_data %>%
+merged_data <- bind_rows(merged_data %>% filter(!is.na(match_level)), merged_data_genus) %>% 
   select(-MAG.x)
+
 
 # Again - CHECK some numbers!
 # check merged data
-nrow(merged_data)
+nrow(merged_data) == nrow(feat)
 
 # Count how many ASVs matched at the genus level
 count_ASV_GENUS <- sum(merged_data$match_level == "genus", na.rm = TRUE)
@@ -200,26 +166,23 @@ MAGs_unique_FAMILY <- nrow(mags_filtered_FAMILY)
 na_rows_family <- merged_data %>% filter(is.na(match_level))
 
 # Left join on filtered rows
-merged_data_family <- left_join(na_rows_family, mags_filtered_FAMILY %>% select(MAG_family, MAG), by = c("ASV_family" = "MAG_family"))
-
-# Need to rename the column due to the default naming
-merged_data_family <- merged_data_family %>%
-  rename(MAG = MAG.y)
-
+merged_data_family <- left_join(
+  na_rows_family,
+  select(mags_filtered_FAMILY, MAG_family, MAG),
+  by = c("ASV_family" = "MAG_family")
+) %>% 
+  rename(MAG = MAG.y) %>% 
 # Fill in new_column with 'family' for newly added rows
-merged_data_family <- merged_data_family %>%
   mutate(match_level = ifelse(!is.na(MAG), "family", NA))
 
 # Combine original merged_data with new_merged_data
-merged_data <- bind_rows(merged_data %>% filter(!is.na(match_level)), merged_data_family)
-
-# Need to remove random MAG.x column it makes
-merged_data <- merged_data %>%
+merged_data <- bind_rows(merged_data %>% filter(!is.na(match_level)), merged_data_family) %>% 
   select(-MAG.x)
+
 
 # Again - CHECK some numbers!
 # check merged data
-nrow(merged_data)
+nrow(merged_data) == nrow(feat)
 
 # Count how many ASVs matched at the genus level
 count_ASV_FAMILY <- sum(merged_data$match_level == "family", na.rm = TRUE)
@@ -245,26 +208,23 @@ MAGs_unique_ORDER <- nrow(mags_filtered_ORDER)
 na_rows_order <- merged_data %>% filter(is.na(match_level))
 
 # Left join on filtered rows
-merged_data_order <- left_join(na_rows_order, mags_filtered_ORDER %>% select(MAG_order, MAG), by = c("ASV_order" = "MAG_order"))
-
-# Need to rename the column due to the default naming
-merged_data_order <- merged_data_order %>%
-  rename(MAG = MAG.y)
-
+merged_data_order <- left_join(
+  na_rows_order,
+  select(mags_filtered_ORDER, MAG_order, MAG),
+  by = c("ASV_order" = "MAG_order")
+) %>% 
+  rename(MAG = MAG.y) %>% 
 # Fill in new_column with 'family' for newly added rows
-merged_data_order <- merged_data_order %>%
   mutate(match_level = ifelse(!is.na(MAG), "order", NA))
 
 # Combine original merged_data with new_merged_data
-merged_data <- bind_rows(merged_data %>% filter(!is.na(match_level)), merged_data_order)
-
-# Need to remove random MAG.x column it makes
-merged_data <- merged_data %>%
+merged_data <- bind_rows(merged_data %>% filter(!is.na(match_level)), merged_data_order) %>% 
   select(-MAG.x)
+
 
 # Again - CHECK some numbers!
 # check merged data
-nrow(merged_data)
+nrow(merged_data) == nrow(feat)
 
 # Count how many ASVs matched at the genus level
 count_ASV_ORDER <- sum(merged_data$match_level == "order", na.rm = TRUE)
@@ -281,7 +241,7 @@ count_ASV_ORDER <- sum(merged_data$match_level == "order", na.rm = TRUE)
 feat_column_sums <- colSums(feat[2:(ncol(feat) - 1)])
 
 # Identify columns that sum to less than 100
-samples_to_remove <- names(feat_column_sums[feat_column_sums < 1000])
+samples_to_remove <- names(feat_column_sums[feat_column_sums < 100])
 
 # Extract columns that sum to less than 100 into a new data matrix
 removed_samples <- feat %>%
@@ -308,32 +268,26 @@ convert_to_relative_abundance <- function(column) {
 feat_filt_relab <- feat_filt %>%
   mutate(across(2:(ncol(.) - 1), convert_to_relative_abundance))
   
-#write.csv(feat_filt_relab, "relabund_test_out.csv")
-
 
 ######### Convert feature table to long format and bind with MAG data ##########
 # Pivot longer to get the feature table in the right format
 feat_filt_relab_long <- feat_filt_relab %>%
-  pivot_longer(
-    cols = 2:(ncol(feat_filt_relab) - 1),
-    names_to = "Sample",
-    values_to = "Relabund")
-
-# Expand taxonomy column
-feat_filt_relab_long <- feat_filt_relab_long %>%
-  separate(taxonomy, into = c("d","p","c","o","f","g","s"), sep = ";", remove = FALSE)
-
-# Match the ASV ID with the MAG it matched to from the comparing section 
-feat_filt_relab_long <- feat_filt_relab_long %>%
-  left_join(
-    merged_data %>% select(ASV, MAG, match_level),
-    by = "ASV")
-
-# Match the MAG ID with the MAG metatdata in the 'mags' data matrix 
-feat_filt_relab_long <- feat_filt_relab_long %>%
-  left_join(
-    mags %>% select(MAG, basin, compl, contam, sPROD, acetatePROD, METHANO),
-    by = "MAG")
+  pivot_longer(cols = 2:(ncol(feat_filt_relab) - 1),
+               names_to = "Sample",
+               values_to = "Relabund") %>%
+  # Expand taxonomy column
+  separate(
+    taxonomy,
+    into = c("d", "p", "c", "o", "f", "g", "s"),
+    sep = ";",
+    remove = FALSE
+  ) %>%
+  # Match the ASV ID with the MAG it matched to from the comparing section
+  left_join(merged_data %>% select(ASV, MAG, match_level), by = "ASV") %>%
+  
+  # Match the MAG ID with the MAG metatdata in the 'mags' data matrix
+  left_join(mags %>% select(MAG, basin, compl, contam, sPROD, acetatePROD, METHANO),
+            by = "MAG")
 
 
 ###############################################################################

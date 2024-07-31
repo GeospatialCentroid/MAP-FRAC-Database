@@ -312,7 +312,7 @@ merged_data_OUTPUT <- merged_data_FINAL %>%
   select(-all_of(remove_columns))
 
 ##### SAVE FINAL DATA FRAME FOR USER ####
-write_csv(merged_data_OUTPUT, "ASV_to_MAGs_output.csv")
+#write_csv(merged_data_OUTPUT, "ASV_to_MAGs_output.csv")
 
 
 # Summarize the data to get counts of each match_level
@@ -328,7 +328,7 @@ match_level_counts <- match_level_counts %>%
   mutate(label = paste0(match_level, "\n(n=", count, ", ", percentage, "%)"))
 
 ##### SAVE COUNTS AS OUTPUT ####
-write.csv(match_level_counts, "ASV_matching_percents.csv")
+#write.csv(match_level_counts, "ASV_matching_percents.csv")
 
 
 

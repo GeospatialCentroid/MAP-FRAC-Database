@@ -12,7 +12,17 @@ library(leaflegend)
 library(DT)
 library(tidyverse)
 library(data.table)
+library(viridis)
+library(ggrepel)
 
+# source tool functions
+purrr::map(list.files(
+  path = "src/",
+  pattern = "*.R",
+  full.names = TRUE,
+  recursive = TRUE
+),
+source)
 
 # read in data
 #load("data/app_data.RData")
@@ -308,8 +318,40 @@ ui <- fluidPage(
     ## Tool -----------
     tabPanel(
       "MAG Matching Tool",
-      card(fileInput("data_upload", "Upload 16S .txt file:", accept = ".txt"),
-           tableOutput("data_preview"))
+      card(
+        fileInput("data_upload", "Upload 16S .txt file:", accept = ".txt"),
+        tableOutput("data_preview")
+      ),
+      card(card_body(
+        layout_column_wrap(
+          width = 1 / 2,
+          style = "padding: 10px;",
+          actionButton("run_tool", "Execute Matching Tool", class = "btn-primary"),
+          actionButton("generate_report", "Generate Report", class = "btn-primary")
+        )
+      )),
+      fluidRow(
+        textOutput("loading_message"),
+          card(height = "100%",
+            card_body(
+              layout_column_wrap(
+            width = 1 / 2,
+            style = "padding: 10px;",
+          plotlyOutput("p1"),
+          plotlyOutput("p2"),
+          br(),
+          plotlyOutput("p3"),
+          plotlyOutput("p4"),
+          plotlyOutput("p5"),
+          plotlyOutput("p6"),
+          plotlyOutput("p7"))
+            )
+        ),
+        hr(),
+        card(
+          style = "padding: 10px;",
+          DT::dataTableOutput("data_output", height = "200px"))
+      )
     )
   )
 )
@@ -1047,6 +1089,180 @@ server <- function(input, output, session) {
     head(user_data())
   })
   
+  # Execute tool
+  
+  # Reactive value to track loading state
+  is_loading <- reactiveVal(FALSE)
+  
+  observeEvent(input$run_tool, {
+    req(user_data())
+    
+    # Set loading state to TRUE
+    is_loading(TRUE)
+    
+    # Simulate data processing with a delay (replace this with actual processing)
+    Sys.sleep(2)
+    
+    tool_outputs <- reactive({
+      run_matching_tool(mag_file = "tool/shale_MAGs_978.txt", feat = user_data())
+    })
+    
+    plots <- reactive({
+      generate_plots(
+        tool_outputs()$match_level_counts,
+        tool_outputs()$feat_filt_relab_long,
+        interactive = TRUE
+      )
+    })
+    
+    # Set loading state to FALSE
+    is_loading(FALSE)
+    
+    # Output loading message or an empty string based on the loading state
+    output$loading_message <- renderText({
+      if (is_loading()) {
+        "Loading data, please wait..."
+      } else {
+        ""
+      }
+    })
+    
+    output$data_output <- DT::renderDataTable(
+      tool_outputs()$merged_data_OUTPUT,
+      options = list(
+        paging = FALSE,
+        pageLength = 10,
+        autoWidth = TRUE
+      )
+    )
+    
+    
+    output$p1 <- renderPlotly({
+      plots()$p1 %>%
+        layout(
+          plot_bgcolor = 'transparent',
+          paper_bgcolor = 'transparent',
+          font = list(color = 'white')
+        )
+      })
+    
+    output$p2 <- renderPlotly({
+     p2 <-  plots()$p2 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+     
+     ggplotly(p2)
+      
+    })
+    
+    
+    output$p3 <- renderPlotly({
+      p3 <-  plots()$p3 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+      
+      ggplotly(p3)
+      
+    })
+    
+    
+    output$p4 <- renderPlotly({
+      p4 <-  plots()$p4 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+      
+      ggplotly(p4)
+      
+    })
+    
+    
+    output$p5 <- renderPlotly({
+      p5 <-  plots()$p5 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+      
+      ggplotly(p5)
+      
+    })
+    
+    
+    output$p6 <- renderPlotly({
+      p6 <-  plots()$p6 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+      
+      ggplotly(p6)
+      
+    })
+    
+    
+    output$p7 <- renderPlotly({
+      p7 <-  plots()$p7 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+      
+      ggplotly(p7)
+      
+    })
+    
+    
+  })
+      
+
   
 }
 

@@ -44,10 +44,10 @@
   color: white !important;
 }
 
-/* text color on Mac
+/* text color needed for some systems */
 td {
     color: white; !important
 }
-*/
+
 
         

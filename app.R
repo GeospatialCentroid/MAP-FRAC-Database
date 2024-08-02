@@ -12,7 +12,17 @@ library(leaflegend)
 library(DT)
 library(tidyverse)
 library(data.table)
+library(viridis)
+library(ggrepel)
 
+# source tool functions
+purrr::map(list.files(
+  path = "src/",
+  pattern = "*.R",
+  full.names = TRUE,
+  recursive = TRUE
+),
+source)
 
 # read in data
 #load("data/app_data.RData")
@@ -233,7 +243,7 @@ ui <- fluidPage(
         title = "",
         id = "nav_genome",
         full_screen = TRUE,
-        height = 600,
+        #height = 1000,
         # layout_sidebar(
         #   open = TRUE,
         sidebar = sidebar(
@@ -254,6 +264,7 @@ ui <- fluidPage(
               ),
               selected = "genus"
             ),
+            br(),
             accordion(
               open = FALSE,
               accordion_panel(
@@ -273,6 +284,7 @@ ui <- fluidPage(
                 )
               )
             ),
+            hr(),
             em(
               "Disclaimer: Values shown on the map represent the maximum relative abundance value
                                for each taxa (taxonomic level to summarize by selected by user abover) averaged within
@@ -291,14 +303,55 @@ ui <- fluidPage(
           )
         ), 
         nav_panel("MAG Relative Abundance",
-                  leafletOutput("genome_map", height = "100%")),
+                  card(height = 600, leafletOutput("genome_map", height = "100%")),
+                  card(DT::dataTableOutput("abundance_table"))),
         nav_panel("MAG Cores",
-                  leafletOutput("cores_map", height = "100%"))
+                  card(height = 600, leafletOutput("cores_map", height = "100%")),
+                  card(DT::dataTableOutput("cores_table")))
 
           
           ),
-      card(height = 600, DT::dataTableOutput("genome_table"))
+     
       
+    ),
+    
+    ## Tool -----------
+    tabPanel(
+      "MAG Matching Tool",
+      card(
+        fileInput("data_upload", "Upload 16S .txt file:", accept = ".txt"),
+        tableOutput("data_preview")
+      ),
+      card(card_body(
+        layout_column_wrap(
+          width = 1 / 2,
+          style = "padding: 10px;",
+          actionButton("run_tool", "Execute Matching Tool", class = "btn-primary"),
+          actionButton("generate_report", "Generate Report", class = "btn-primary")
+        )
+      )),
+      fluidRow(
+        textOutput("loading_message"),
+          card(height = "100%",
+            card_body(
+              layout_column_wrap(
+            width = 1 / 2,
+            style = "padding: 10px;",
+          plotlyOutput("p1", height = "500px", width = "500px"),
+          plotlyOutput("p2"),
+          br(),
+          plotlyOutput("p3"),
+          plotlyOutput("p4"),
+          plotlyOutput("p5"),
+          plotlyOutput("p6"),
+          plotlyOutput("p7"))
+            )
+        ),
+        hr(),
+        card(
+          style = "padding: 10px;",
+          DT::dataTableOutput("data_output", height = "200px"))
+      )
     )
   )
 )
@@ -466,7 +519,7 @@ server <- function(input, output, session) {
   })
   
   
-  ## sample map ----
+  ## Sample Map ----
   output$sample_map <- leaflet::renderLeaflet({
     leaflet() %>%
       addProviderTiles("OpenStreetMap") %>%
@@ -766,30 +819,32 @@ server <- function(input, output, session) {
   })
    
    
-   ## sample table ------
+   ### sample table ------
    output$sample_table <- DT::renderDataTable(st_drop_geometry(sample_app),
                                               options = list(paging = FALSE))
    
 
-  # genome filter ----------------
-  taxa_mod <- callModule(
-    module = selectizeGroupServer,
-    id = "taxonomy_filter",
-    inline = FALSE,
-    # for now filter out international basins
-    data = filter(genome_app, !Basin %in% c("Sichuan", "Western Canadian", "Bowland Shale")),
-    vars = c(
-      "domain",
-      "phylum",
-      "class",
-      "order",
-      "family",
-      "genus",
-      "species"
-    )
-  )
+ 
   
-  ## genome map -----
+  ## Genome Map -----
+   
+   ### genome filter ----------------
+   taxa_mod <- callModule(
+     module = selectizeGroupServer,
+     id = "taxonomy_filter",
+     inline = FALSE,
+     # for now filter out international basins
+     data = filter(genome_app, !Basin %in% c("Sichuan", "Western Canadian", "Bowland Shale")),
+     vars = c(
+       "domain",
+       "phylum",
+       "class",
+       "order",
+       "family",
+       "genus",
+       "species"
+     )
+   )
    
    ### MAG Relative Abundance ------
   
@@ -914,9 +969,14 @@ server <- function(input, output, session) {
     
   })
   
+  #### abundance table ------
+  output$abundance_table <- DT::renderDataTable(taxa_mod(),
+                                                options = list(paging = FALSE))
+  
   ### MAG Cores ------
   
-  cores_genome <- reactive({mag_cores %>% 
+  #### data for map
+  cores_map <- reactive({mag_cores %>% 
     filter(perc_samples_present_per_basin >= input$core_cutoff) %>% 
     group_by(basin) %>% 
     count() %>% 
@@ -925,11 +985,17 @@ server <- function(input, output, session) {
     st_as_sf()
   })
   
+  #### data for table
+  cores_table <- reactive({
+    mag_cores %>%
+      filter(perc_samples_present_per_basin >= input$core_cutoff)
+  })
+  
   ## cores color palette
   pal_cores <- reactive({
     colorNumeric(
       palette = c('#2cb2ba', '#94b674', '#fbb92d'),
-      domain = cores_genome()$n
+      domain = cores_map()$n
     )
   })
   
@@ -959,16 +1025,16 @@ server <- function(input, output, session) {
       clearControls() %>%
       addPolygons(
         group = "Basins",
-        data = cores_genome(),
+        data = cores_map(),
         stroke = FALSE,
         fillOpacity = 0.65,
         fillColor = ~ pal_cores()(n),
         popup = paste(
           "Basin:",
-          cores_genome()$basin,
+          cores_map()$basin,
           "<br>",
           "Number of MAG Cores:",
-          cores_genome()$n
+          cores_map()$n
         )
       ) %>%
       # addPolygons(
@@ -992,20 +1058,218 @@ server <- function(input, output, session) {
       # ) %>%
       addLegend(
         "bottomright",
-        data = cores_genome(),
+        data = cores_map(),
         values = ~ n,
         pal = pal_cores(),
         title = "Number of <br/> MAG Cores"
       ) 
     
+    #### cores table ------
+    output$cores_table <- DT::renderDataTable(cores_table(),
+                                              options = list(paging = FALSE))
+    
     
   })
   
   
-  ## genome table ------
-  output$genome_table <- DT::renderDataTable(taxa_mod(),
-                                             options = list(paging = FALSE))
+  # Tool -------------------------
   
+  user_data <- reactive({
+    req(input$data_upload)
+    
+    ext <- tools::file_ext(input$data_upload$name)
+    
+    validate(need(ext == "txt", "Invalid file; please upload a .txt file."))
+    
+    read.delim(input$data_upload$datapath, header = TRUE, skip = 1)
+
+  })
+  
+  output$data_preview <- renderTable({
+    head(user_data())
+  })
+  
+  # Execute tool
+  
+  # Reactive value to track loading state
+  is_loading <- reactiveVal(FALSE)
+  
+  observeEvent(input$run_tool, {
+    req(user_data())
+    
+    # Set loading state to TRUE
+    is_loading(TRUE)
+    
+    # Simulate data processing with a delay (replace this with actual processing)
+    Sys.sleep(2)
+    
+    tool_outputs <- reactive({
+      run_matching_tool(mag_file = "tool/shale_MAGS_978.txt", feat = user_data())
+    })
+    
+    plots <- reactive({
+      generate_plots(
+        tool_outputs()$match_level_counts,
+        tool_outputs()$feat_filt_relab_long,
+        interactive = TRUE
+      )
+    })
+    
+    # Set loading state to FALSE
+    is_loading(FALSE)
+    
+    # Output loading message or an empty string based on the loading state
+    output$loading_message <- renderText({
+      if (is_loading()) {
+        "Loading data, please wait..."
+      } else {
+        ""
+      }
+    })
+    
+    output$data_output <- DT::renderDataTable(
+      tool_outputs()$merged_data_OUTPUT,
+      options = list(
+        paging = FALSE,
+        pageLength = 10,
+        autoWidth = TRUE
+      )
+    )
+    
+    
+    output$p1 <- renderPlotly({
+      plots()$p1 %>%
+        layout(
+          plot_bgcolor = 'transparent',
+          paper_bgcolor = 'transparent',
+          font = list(color = 'white')
+        )
+      })
+    
+    output$p2 <- renderPlotly({
+      plots()$p2 %>%
+        layout(
+          plot_bgcolor = 'transparent',
+          paper_bgcolor = 'transparent',
+          font = list(color = 'white')
+        )
+    })
+     # p2 <-  plots()$p2 +
+     #    theme(
+     #      text = element_text(color = "white"),
+     #      axis.text = element_text(color = "white"),
+     #      panel.background = element_rect(fill = 'transparent'),
+     #      #transparent panel bg
+     #      plot.background = element_rect(fill = 'transparent', color =
+     #                                       NA),
+     #      legend.background = element_rect(fill = 'transparent'),
+     #      #transparent legend bg
+     #      legend.box.background = element_rect(fill = 'transparent')
+     #    )
+     # 
+     # ggplotly(p2)
+      
+   # })
+    
+    
+    output$p3 <- renderPlotly({
+      p3 <-  plots()$p3 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+      
+      ggplotly(p3)
+      
+    })
+    
+    
+    output$p4 <- renderPlotly({
+      p4 <-  plots()$p4 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+      
+      ggplotly(p4)
+      
+    })
+    
+    
+    output$p5 <- renderPlotly({
+      p5 <-  plots()$p5 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+      
+      ggplotly(p5)
+      
+    })
+    
+    
+    output$p6 <- renderPlotly({
+      p6 <-  plots()$p6 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+      
+      ggplotly(p6)
+      
+    })
+    
+    
+    output$p7 <- renderPlotly({
+      p7 <-  plots()$p7 +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white"),
+          panel.background = element_rect(fill = 'transparent'),
+          #transparent panel bg
+          plot.background = element_rect(fill = 'transparent', color =
+                                           NA),
+          legend.background = element_rect(fill = 'transparent'),
+          #transparent legend bg
+          legend.box.background = element_rect(fill = 'transparent')
+        )
+      
+      ggplotly(p7)
+      
+    })
+    
+    
+  })
+      
+
   
 }
 

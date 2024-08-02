@@ -47,7 +47,8 @@ generate_plots <- function(match_level_counts,
           showgrid = FALSE,
           zeroline = FALSE,
           showticklabels = FALSE
-        )
+        ),
+        margin = list(l = 0, r = 0, b = 0, t = 50)
       )
     
   } else {
@@ -94,10 +95,52 @@ generate_plots <- function(match_level_counts,
   feat_filt_relab_long_p2 <- feat_filt_relab_long %>%
     filter(Relabund > 0.05, !is.na(p)) %>%
     mutate(first_na = factor(first_na, levels = c("c", "o", "f", "g", "s"))) %>%
-    mutate(match_level = factor(match_level, levels = match_order))
+    mutate(match_level = factor(match_level, levels = match_order)) %>% 
+    filter(Relabund > 1) %>%
+    mutate(
+      jittered_x = jitter(as.numeric(as.factor(first_na)), amount = 0.25),
+      jittered_y = jitter(as.numeric(as.factor(p)), amount = 0.25)
+    )
+  
+  if(interactive) {
+
+    p2 <- feat_filt_relab_long_p2 %>%
+      plot_ly(
+        x = ~jittered_x,
+        y = ~jittered_y,
+        # x = ~first_na,
+        # y = ~p,
+        type = 'scatter',
+        mode = 'markers',
+        color = ~match_level,
+        colors = c("#F2671F", "#C91B26", "#9C0F5F", "#60047A", "#160A47", "#808080"),
+        marker = list(
+          size = ~Relabund,
+          opacity = 0.8,
+          symbol = 'circle'
+        ),
+        text = ~paste("First NA:", first_na, "<br>Phylum:", p, "<br>Relabund:", round(Relabund, 2), "<br>Match Level:", match_level),  # Custom hover text
+        hoverinfo = 'text'  # Show only custom hover text
+      ) %>% layout(
+        title = "Matching ASVs to MAGs",
+        xaxis = list(
+          title = "Lowest level of ASV taxonomic classification",
+          tickvals = 1:5,
+          ticktext = levels(as.factor(feat_filt_relab_long_p2$first_na))),
+        yaxis = list(
+          title = "Phylum",
+          tickvals = 1:length(unique(feat_filt_relab_long_p2$p)),
+          ticktext = levels(as.factor(feat_filt_relab_long_p2$p))
+        ),
+        legend = list(title = list(text = "Match level<br>Sized by<br>Relative Abundance")),
+        showlegend = TRUE
+      )
+      
+
+  } else {
   
   p2 <- ggplot(
-    feat_filt_relab_long_p2 %>% filter(Relabund > 1),
+    feat_filt_relab_long_p2,
     aes(x = first_na, y = p, color = match_level)
   ) +
     geom_jitter(
@@ -115,12 +158,13 @@ generate_plots <- function(match_level_counts,
       "#160A47",
       "#808080"
     )) +
-    labs(title = "Matching ASVs to MAGs\nASVs sized by relative abundance and colored by taxonomic level of match to MAG",
-         fill = "Match level",
+    labs(title = "Matching ASVs to MAGs",
+        fill = "Match level",
          size = "% Relative Abundance") +
     xlab("Lowest level of ASV taxonomic classification") +
     ylab("Phylum") +
     guides(fill = guide_legend(override.aes = list(size = 5)))
+  }
   
   # STACKED BAR CHARTS #############################################
   plasma_palette <- viridis_pal(option = "plasma", direction = -1)(20)

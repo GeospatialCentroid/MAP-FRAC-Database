@@ -129,7 +129,7 @@ run_matching_tool <- function(mag_file, feat) {
 }
 
 # Example usage:
-#result <- run_matching_tool("tool/shale_MAGs_978.txt", "tool/feature_table_w_tax.txt")
+# result <- run_matching_tool("tool/shale_MAGs_978.txt", read.delim("tool/feature_table_w_tax.txt", header = TRUE, skip = 1))
 # merged_data_OUTPUT <- result$merged_data_OUTPUT
 # match_level_counts <- result$match_level_counts
 # feat_filt_relab_long <- result$feat_filt_relab_long

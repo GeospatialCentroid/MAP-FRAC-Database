@@ -337,7 +337,7 @@ ui <- fluidPage(
               layout_column_wrap(
             width = 1 / 2,
             style = "padding: 10px;",
-          plotlyOutput("p1"),
+          plotlyOutput("p1", height = "500px", width = "500px"),
           plotlyOutput("p2"),
           br(),
           plotlyOutput("p3"),
@@ -1104,7 +1104,7 @@ server <- function(input, output, session) {
     Sys.sleep(2)
     
     tool_outputs <- reactive({
-      run_matching_tool(mag_file = "tool/shale_MAGs_978.txt", feat = user_data())
+      run_matching_tool(mag_file = "tool/shale_MAGS_978.txt", feat = user_data())
     })
     
     plots <- reactive({
@@ -1147,22 +1147,29 @@ server <- function(input, output, session) {
       })
     
     output$p2 <- renderPlotly({
-     p2 <-  plots()$p2 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
+      plots()$p2 %>%
+        layout(
+          plot_bgcolor = 'transparent',
+          paper_bgcolor = 'transparent',
+          font = list(color = 'white')
         )
-     
-     ggplotly(p2)
-      
     })
+     # p2 <-  plots()$p2 +
+     #    theme(
+     #      text = element_text(color = "white"),
+     #      axis.text = element_text(color = "white"),
+     #      panel.background = element_rect(fill = 'transparent'),
+     #      #transparent panel bg
+     #      plot.background = element_rect(fill = 'transparent', color =
+     #                                       NA),
+     #      legend.background = element_rect(fill = 'transparent'),
+     #      #transparent legend bg
+     #      legend.box.background = element_rect(fill = 'transparent')
+     #    )
+     # 
+     # ggplotly(p2)
+      
+   # })
     
     
     output$p3 <- renderPlotly({

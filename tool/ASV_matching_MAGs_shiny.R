@@ -4,7 +4,7 @@ library(ggplot2)
 
 #### READ IN FILES ####
 # read in MAG table - this will always be the same (unless updated in the future by me)
-mags <- read.delim("tool/shale_MAGs_978.txt", header = TRUE)
+mags <- read.delim("tool/shale_MAGS_978.txt", header = TRUE)
 
 # read in user feature table 
 feat <- read.delim("tool/feature_table_w_tax.txt", header = TRUE, skip = 1)

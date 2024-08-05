@@ -26,11 +26,11 @@ generate_plots <- function(match_level_counts,
       type = "pie",
       marker = list(
         colors =  c(
-          "#F2671F",
-          "#C91B26",
-          "#9C0F5F",
-          "#60047A",
-          "#160A47",
+          "#7e03a8",
+          "#f89540",
+          "#cc4778",
+          "#f0f921",
+          "#221aed",
           "#808080"
         )
       )

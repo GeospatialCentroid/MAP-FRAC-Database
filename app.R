@@ -15,7 +15,7 @@ library(data.table)
 library(viridis)
 library(ggrepel)
 library(shinycssloaders)
-library(datamods)
+#library(datamods)
 
 # source tool functions
 purrr::map(list.files(

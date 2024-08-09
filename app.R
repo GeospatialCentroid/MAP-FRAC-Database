@@ -1099,7 +1099,7 @@ server <- function(input, output, session) {
     #req(user_data())
     
     shinycssloaders::showPageSpinner(type = 1, color = "#94b674")
-    Sys.sleep(5)
+    Sys.sleep(3)
    
 
     tool_outputs <- reactive({

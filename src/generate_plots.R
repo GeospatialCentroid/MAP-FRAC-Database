@@ -27,10 +27,10 @@ generate_plots <- function(match_level_counts,
       marker = list(
         colors =  c(
           "#f89540",
-          "#221aed",
+          "#6a00a8",
           "#f0f921",
-          "#160A47",
-          "#9C0F5F",
+          "#0d0887",
+          "#cc4778",
           "#808080"
         )
       )
@@ -113,7 +113,7 @@ generate_plots <- function(match_level_counts,
         type = 'scatter',
         mode = 'markers',
         color = ~match_level,
-        colors = c("#F2671F", "#C91B26", "#9C0F5F","#221aed", "#990ac2", "#808080"),
+        colors = c("#F2671F", "#C91B26", "#9C0F5F","#f0f921", "#990ac2", "#808080"),
         marker = list(
           size = ~Relabund,
           opacity = 0.8,

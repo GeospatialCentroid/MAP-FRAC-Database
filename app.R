@@ -30,6 +30,9 @@ source)
 #load("data/app_data.RData")
 load("data/app_data_Update.RData")
 
+# read in mag file for tool
+mag_file <- read.delim("tool/shale_MAGS_978.txt", header = TRUE)
+
 # create color palettes (this is a hacky way based on alphabetical order of basin names)
 pal_basin <- colorFactor(
   palette = c("#72266C", "#0A81A7", rep("grey", 5), "#F15F26", rep("grey", 3),
@@ -1103,7 +1106,7 @@ server <- function(input, output, session) {
    
 
     tool_outputs <- reactive({
-      run_matching_tool(mag_file = "tool/shale_MAGS_978.txt", feat = user_data())
+      run_matching_tool(mag_file = mag_file, feat = user_data())
     })
     
     plots <- reactive({
@@ -1271,8 +1274,10 @@ server <- function(input, output, session) {
         output_format = "pdf_document",
         output_file = file,
         params = list(
-          match_level_counts = tool_outputs$match_level_counts,
-          feat_filt_rehab_long = tool_outputs$feat_filt_rehab_long),
+          mag_file = mag_file,
+          data = user_data()),
+          #match_level_counts = tool_outputs()$match_level_counts,
+          #feat_filt_rehab_long = tool_outputs()$feat_filt_rehab_long),
         envir = new.env(parent = globalenv()),
         clean = F,
         encoding = "utf-8"

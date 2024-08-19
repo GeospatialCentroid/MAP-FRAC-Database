@@ -1,0 +1,72 @@
+---
+title: "MAG Matching Tool Report"
+output: pdf_document
+date: "Report generated on `r Sys.Date()` from https://geocentroid.shinyapps.io/MAP-FRAC-Database/"
+params:
+  mag_file: NA
+  data: NA
+ # match_level_counts: NA
+  #feat_filt_rehab_long: NA
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r tool}
+tool_outputs <- run_matching_tool(mag_file = params$mag_file, feat = params$data)
+
+mlc <- tool_outputs$match_level_counts
+
+ffrl <- tool_outputs$feat_filt_relab_long
+
+```
+
+```{r plots}
+plots <- generate_plots(match_level_counts = mlc, feat_filt_relab_long = ffrl, interactive = FALSE)
+```
+
+------------------------------------------------------------------------
+
+```{r plot1, out.width="100%", fig.height=6, fig.show='hold', fig.align='center'}
+plots$p1
+```
+
+</br>
+
+```{r plot2, out.width="100%", fig.height=5, fig.show='hold', fig.align='center'}
+plots$p2
+
+```
+
+</br>
+
+```{r plot3, out.width="100%", fig.height=7, fig.show='hold', fig.align='center'}
+plots$p3 +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(ncol = 3, title.position = "top"))
+```
+
+</br>
+
+```{r plot4, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
+plots$p4
+```
+
+</br>
+
+```{r plot5, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
+plots$p5
+```
+
+</br>
+
+```{r plot6, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
+plots$p6
+```
+
+</br>
+
+```{r plot7, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
+plots$p7
+```

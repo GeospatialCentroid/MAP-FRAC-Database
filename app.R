@@ -324,12 +324,13 @@ ui <- fluidPage(
         fileInput("data_upload", "Upload 16S .txt file:", accept = ".txt"),
         tableOutput("data_preview")
       ),
+      card(actionButton("run_tool", "Execute Matching Tool", class = "btn-primary")),
       card(card_body(
         layout_column_wrap(
           width = 1 / 2,
           style = "padding: 10px;",
-          actionButton("run_tool", "Execute Matching Tool", class = "btn-primary"),
-          actionButton("generate_report", "Generate Report", class = "btn-primary")
+          downloadButton("report", "Download Report", class = "btn-secondary"),
+          downloadButton("tool_data", "Download Data")
         )
       )),
       fluidRow(
@@ -1092,8 +1093,7 @@ server <- function(input, output, session) {
     head(user_data())
   })
   
-  # Execute tool
-  
+  ## Execute tool ----
   
   observeEvent(input$run_tool, {
     #req(user_data())
@@ -1143,22 +1143,6 @@ server <- function(input, output, session) {
           font = list(color = 'white')
         )
     })
-     # p2 <-  plots()$p2 +
-     #    theme(
-     #      text = element_text(color = "white"),
-     #      axis.text = element_text(color = "white"),
-     #      panel.background = element_rect(fill = 'transparent'),
-     #      #transparent panel bg
-     #      plot.background = element_rect(fill = 'transparent', color =
-     #                                       NA),
-     #      legend.background = element_rect(fill = 'transparent'),
-     #      #transparent legend bg
-     #      legend.box.background = element_rect(fill = 'transparent')
-     #    )
-     # 
-     # ggplotly(p2)
-      
-   # })
     
     
     output$p3 <- renderPlotly({
@@ -1259,7 +1243,43 @@ server <- function(input, output, session) {
     
     
   })
+  
+  
+  ## Generate Report -----
+  
+  output$report <- downloadHandler(
+    
+    filename = function() {
+      paste0("MAG_Matching_Tool_Report_", Sys.Date(), ".pdf")
+    },
+    content = function(file) {
+      # render file in temp directory so .knit files don't go in app directory
+      tempReport <- file.path(tempdir(), "generate_report.Rmd")
+      file.copy("tool/generate_report.Rmd", tempReport, overwrite = TRUE)
       
+      # add blurb while rendering
+      id <- showNotification(
+        "Generating report...", 
+        duration = NULL, 
+        closeButton = FALSE
+      )
+      
+      on.exit(removeNotification(id), add = TRUE)
+      
+      rmarkdown::render(
+        tempReport,
+        output_format = "pdf_document",
+        output_file = file,
+        params = list(
+          match_level_counts = tool_outputs$match_level_counts,
+          feat_filt_rehab_long = tool_outputs$feat_filt_rehab_long),
+        envir = new.env(parent = globalenv()),
+        clean = F,
+        encoding = "utf-8"
+      )
+    }
+  )
+
 
   
 }

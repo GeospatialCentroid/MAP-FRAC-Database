@@ -15,7 +15,7 @@ library(data.table)
 library(viridis)
 library(ggrepel)
 library(shinycssloaders)
-library(datamods)
+#library(datamods)
 
 # source tool functions
 purrr::map(list.files(
@@ -1099,7 +1099,7 @@ server <- function(input, output, session) {
     #req(user_data())
     
     shinycssloaders::showPageSpinner(type = 1, color = "#94b674")
-    Sys.sleep(5)
+    Sys.sleep(3)
    
 
     tool_outputs <- reactive({

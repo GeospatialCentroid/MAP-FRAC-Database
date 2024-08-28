@@ -26,11 +26,11 @@ generate_plots <- function(match_level_counts,
       type = "pie",
       marker = list(
         colors =  c(
-          "#F2671F",
-          "#C91B26",
-          "#9C0F5F",
-          "#60047A",
-          "#160A47",
+          "#f89540",
+          "#6a00a8",
+          "#f0f921",
+          "#0d0887",
+          "#cc4778",
           "#808080"
         )
       )
@@ -113,7 +113,7 @@ generate_plots <- function(match_level_counts,
         type = 'scatter',
         mode = 'markers',
         color = ~match_level,
-        colors = c("#F2671F", "#C91B26", "#9C0F5F", "#60047A", "#160A47", "#808080"),
+        colors = c("#F2671F", "#C91B26", "#9C0F5F","#f0f921", "#990ac2", "#808080"),
         marker = list(
           size = ~Relabund,
           opacity = 0.8,
@@ -132,7 +132,8 @@ generate_plots <- function(match_level_counts,
           tickvals = 1:length(unique(feat_filt_relab_long_p2$p)),
           ticktext = levels(as.factor(feat_filt_relab_long_p2$p))
         ),
-        legend = list(title = list(text = "Match level<br>Sized by<br>Relative Abundance")),
+        legend = list(title = list(text = "Match level<br>Sized by<br>Relative Abundance"),
+                      itemsizing='constant'),
         showlegend = TRUE
       )
       

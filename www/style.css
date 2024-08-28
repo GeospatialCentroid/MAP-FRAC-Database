@@ -50,4 +50,10 @@ td {
 }
 
 
+/* button hover color */
+.btn-primary:hover {
+    background: #94b674;
+    border-color: #94b674;
+    color: white;
+}
         

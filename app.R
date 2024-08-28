@@ -14,6 +14,8 @@ library(tidyverse)
 library(data.table)
 library(viridis)
 library(ggrepel)
+library(shinycssloaders)
+#library(datamods)
 
 # source tool functions
 purrr::map(list.files(
@@ -27,6 +29,9 @@ source)
 # read in data
 #load("data/app_data.RData")
 load("data/app_data_Update.RData")
+
+# read in mag file for tool
+mag_file <- read.delim("tool/shale_MAGS_978.txt", header = TRUE)
 
 # create color palettes (this is a hacky way based on alphabetical order of basin names)
 pal_basin <- colorFactor(
@@ -71,7 +76,7 @@ ui <- fluidPage(
     bg = "#101010",
     fg = "#FFF",
     primary = "#7198ab",
-    secondary = "#F27F0c",
+    secondary = "#94b674",
     #success = "#a5c90f",
     #base_font = font_google("Inria Sans")
   ),
@@ -322,16 +327,16 @@ ui <- fluidPage(
         fileInput("data_upload", "Upload 16S .txt file:", accept = ".txt"),
         tableOutput("data_preview")
       ),
+      card(actionButton("run_tool", "Execute Matching Tool", class = "btn-primary")),
       card(card_body(
         layout_column_wrap(
           width = 1 / 2,
           style = "padding: 10px;",
-          actionButton("run_tool", "Execute Matching Tool", class = "btn-primary"),
-          actionButton("generate_report", "Generate Report", class = "btn-primary")
+          downloadButton("report", "Download Report", class = "btn-secondary"),
+          downloadButton("tool_data", "Download Data")
         )
       )),
       fluidRow(
-        textOutput("loading_message"),
           card(height = "100%",
             card_body(
               layout_column_wrap(
@@ -339,7 +344,6 @@ ui <- fluidPage(
             style = "padding: 10px;",
           plotlyOutput("p1", height = "500px", width = "500px"),
           plotlyOutput("p2"),
-          br(),
           plotlyOutput("p3"),
           plotlyOutput("p4"),
           plotlyOutput("p5"),
@@ -830,21 +834,24 @@ server <- function(input, output, session) {
    
    ### genome filter ----------------
    taxa_mod <- callModule(
-     module = selectizeGroupServer,
-     id = "taxonomy_filter",
-     inline = FALSE,
-     # for now filter out international basins
-     data = filter(genome_app, !Basin %in% c("Sichuan", "Western Canadian", "Bowland Shale")),
-     vars = c(
-       "domain",
-       "phylum",
-       "class",
-       "order",
-       "family",
-       "genus",
-       "species"
+      module = selectizeGroupServer,
+       id = "taxonomy_filter",
+       inline = FALSE,
+       # for now filter out international basins
+       data = filter(
+         genome_app,
+         !Basin %in% c("Sichuan", "Western Canadian", "Bowland Shale")
+       ),
+       vars = c(
+         "domain",
+         "phylum",
+         "class",
+         "order",
+         "family",
+         "genus",
+         "species"
+       )
      )
-   )
    
    ### MAG Relative Abundance ------
   
@@ -1089,22 +1096,17 @@ server <- function(input, output, session) {
     head(user_data())
   })
   
-  # Execute tool
-  
-  # Reactive value to track loading state
-  is_loading <- reactiveVal(FALSE)
+  ## Execute tool ----
   
   observeEvent(input$run_tool, {
-    req(user_data())
+    #req(user_data())
     
-    # Set loading state to TRUE
-    is_loading(TRUE)
-    
-    # Simulate data processing with a delay (replace this with actual processing)
-    Sys.sleep(2)
-    
+    shinycssloaders::showPageSpinner(type = 1, color = "#94b674")
+    Sys.sleep(3)
+   
+
     tool_outputs <- reactive({
-      run_matching_tool(mag_file = "tool/shale_MAGS_978.txt", feat = user_data())
+      run_matching_tool(mag_file = mag_file, feat = user_data())
     })
     
     plots <- reactive({
@@ -1115,18 +1117,7 @@ server <- function(input, output, session) {
       )
     })
     
-    # Set loading state to FALSE
-    is_loading(FALSE)
-    
-    # Output loading message or an empty string based on the loading state
-    output$loading_message <- renderText({
-      if (is_loading()) {
-        "Loading data, please wait..."
-      } else {
-        ""
-      }
-    })
-    
+
     output$data_output <- DT::renderDataTable(
       tool_outputs()$merged_data_OUTPUT,
       options = list(
@@ -1136,6 +1127,7 @@ server <- function(input, output, session) {
       )
     )
     
+  
     
     output$p1 <- renderPlotly({
       plots()$p1 %>%
@@ -1154,22 +1146,6 @@ server <- function(input, output, session) {
           font = list(color = 'white')
         )
     })
-     # p2 <-  plots()$p2 +
-     #    theme(
-     #      text = element_text(color = "white"),
-     #      axis.text = element_text(color = "white"),
-     #      panel.background = element_rect(fill = 'transparent'),
-     #      #transparent panel bg
-     #      plot.background = element_rect(fill = 'transparent', color =
-     #                                       NA),
-     #      legend.background = element_rect(fill = 'transparent'),
-     #      #transparent legend bg
-     #      legend.box.background = element_rect(fill = 'transparent')
-     #    )
-     # 
-     # ggplotly(p2)
-      
-   # })
     
     
     output$p3 <- renderPlotly({
@@ -1266,9 +1242,49 @@ server <- function(input, output, session) {
       
     })
     
+    shinycssloaders::hidePageSpinner()
+    
     
   })
+  
+  
+  ## Generate Report -----
+  
+  output$report <- downloadHandler(
+    
+    filename = function() {
+      paste0("MAG_Matching_Tool_Report_", Sys.Date(), ".pdf")
+    },
+    content = function(file) {
+      # render file in temp directory so .knit files don't go in app directory
+      tempReport <- file.path(tempdir(), "generate_report.Rmd")
+      file.copy("tool/generate_report.Rmd", tempReport, overwrite = TRUE)
       
+      # add blurb while rendering
+      id <- showNotification(
+        "Generating report...", 
+        duration = NULL, 
+        closeButton = FALSE
+      )
+      
+      on.exit(removeNotification(id), add = TRUE)
+      
+      rmarkdown::render(
+        tempReport,
+        output_format = "pdf_document",
+        output_file = file,
+        params = list(
+          mag_file = mag_file,
+          data = user_data()),
+          #match_level_counts = tool_outputs()$match_level_counts,
+          #feat_filt_rehab_long = tool_outputs()$feat_filt_rehab_long),
+        envir = new.env(parent = globalenv()),
+        clean = F,
+        encoding = "utf-8"
+      )
+    }
+  )
+
 
   
 }

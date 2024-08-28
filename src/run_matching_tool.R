@@ -3,11 +3,11 @@ library(tidyr)
 
 run_matching_tool <- function(mag_file, feat) {
   # Read in files
-  mags <- read.delim(mag_file, header = TRUE)
+  #mags <- read.delim(mag_file, header = TRUE)
   #feat <- read.delim(feature_file, header = TRUE, skip = 1)
   
   # Format MAG table
-  mags <- mags %>%
+  mags <- mag_file %>%
     mutate(
       MAG_genus = sub("(;s__.*)$", "", MAG_FULL_tax),
       MAG_family = sub("(;g__.*)$", "", MAG_FULL_tax),

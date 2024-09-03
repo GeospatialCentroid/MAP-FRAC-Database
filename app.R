@@ -322,12 +322,25 @@ ui <- fluidPage(
     
     ## Tool -----------
     tabPanel(
-      "MAG Matching Tool",
+      "MAG Linking Tool",
+      h4("Leverage the MAP-FRAC genome database to infer function from 16S datasets by linking ASVs to the database of MAP-FRAC MAGs."),
       card(
+        strong("Upload Data"),
+        p("To execute the MAG Matching Tool with your 16S dataset, upload a feature-table.txt 
+          file where rows are unique ASVs, columns are samples, and counts are not converted to 
+          relative abundance. The last column should be named ‘taxonomy’ with the full taxonomic 
+          string corresponding to each ASV listed, taxonomic levels are labeled and separated by 
+          a semicolon (for example, d__Bacteria;p__Thermotogota;c__Thermotogae and so on). 
+          The input file structure is designed to read in the default export of a biom converted 
+          feature table from QIIME2 EMP Protocol, joined with taxonomic classifications of ASVs."),
+        em("Note: taxonomic classifications of 16S amplicon sequences should be done using GTDB 
+           ref 214 classifier to ensure the greatest number of linkages between ASVs and MAGs. 
+           Failure to use the GTDB classifier may result in minimal linkages between ASVs and MAGs."),
+        a(href="EXAMPLE_feature_table_w_tax.txt", "Download Template .txt file", download = NA, target = "_blank"),
         fileInput("data_upload", "Upload 16S .txt file:", accept = ".txt"),
         tableOutput("data_preview")
       ),
-      card(actionButton("run_tool", "Execute Matching Tool", class = "btn-primary")),
+      card(actionButton("run_tool", "Execute Linking Tool", class = "btn-primary")),
       card(card_body(
         layout_column_wrap(
           width = 1 / 2,

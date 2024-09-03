@@ -168,7 +168,7 @@ generate_plots <- function(match_level_counts,
   }
   
   # STACKED BAR CHARTS #############################################
-  plasma_palette <- viridis_pal(option = "plasma", direction = -1)(20)
+  plasma_palette <- viridis_pal(option = "plasma", direction = -1)(length(unique(feat_filt_relab_long$p)))
   
   p3 <- feat_filt_relab_long %>%
     # sum relabund for chart

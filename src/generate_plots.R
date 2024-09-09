@@ -37,7 +37,7 @@ generate_plots <- function(match_level_counts,
     ) %>%
       layout(
         #autosize = F,
-        title = list(text = 'Matching of ASVs by taxonomic level'),
+        title = list(text = 'Total proportion of ASVs that linked to a MAG'),
         xaxis = list(
           showgrid = FALSE,
           zeroline = FALSE,
@@ -48,6 +48,7 @@ generate_plots <- function(match_level_counts,
           zeroline = FALSE,
           showticklabels = FALSE
         ),
+        legend = list(title = list(text = "Taxonomic level<br>where the ASV <br>linked to a MAG")),
         margin = list(l = 0, r = 0, b = 0, t = 50)
       )
     
@@ -64,7 +65,7 @@ generate_plots <- function(match_level_counts,
       )) +
       coord_polar(theta = "y") +
       theme_void() +
-      labs(title = "Matching of ASVs by taxonomic level", fill = "Match Level") +
+      labs(title = "Total proportion of ASVs that linked to a MAG", fill = "Match Level") +
       theme(legend.position = "none") +
       geom_label_repel(
         aes(label = label, y = text_y),
@@ -98,8 +99,20 @@ generate_plots <- function(match_level_counts,
     mutate(match_level = factor(match_level, levels = match_order)) %>% 
     filter(Relabund > 1) %>%
     mutate(
+      # jittered_x = jitter(as.numeric(as.factor(first_na)), amount = 0.25),
+      # jittered_y = jitter(as.numeric(as.factor(p)), amount = 0.25),
+      first_na = case_when(first_na == "d" ~ "Domain",
+                                  first_na == "p" ~ "Phylum",
+                                  first_na == "c" ~ "Class",
+                                  first_na == "o" ~ "Order",
+                                  first_na == "f" ~ "Family",
+                                  first_na == "g" ~ "Genus",
+                                  first_na == "s" ~ "Species"),
+      # factor taxa
+      first_na = factor(first_na, levels = c("Species", "Genus", "Family", "Order", "Class", "Phylum", "Domain")),
       jittered_x = jitter(as.numeric(as.factor(first_na)), amount = 0.25),
-      jittered_y = jitter(as.numeric(as.factor(p)), amount = 0.25)
+      jittered_y = jitter(as.numeric(as.factor(p)), amount = 0.25),
+      
     )
   
   if(interactive) {
@@ -122,11 +135,12 @@ generate_plots <- function(match_level_counts,
         text = ~paste("First NA:", first_na, "<br>Phylum:", p, "<br>Relabund:", round(Relabund, 2), "<br>Match Level:", match_level),  # Custom hover text
         hoverinfo = 'text'  # Show only custom hover text
       ) %>% layout(
-        title = "Matching ASVs to MAGs",
+        title = "Taxonomic classifications of ASVs that linked to MAGs",
         xaxis = list(
           title = "Lowest level of ASV taxonomic classification",
-          tickvals = 1:5,
-          ticktext = levels(as.factor(feat_filt_relab_long_p2$first_na))),
+          tickvals = 1:length(levels(feat_filt_relab_long_p2$first_na)),
+         #tickvals = 1:length(unique(feat_filt_relab_long_p2$first_na)),
+          ticktext = levels(feat_filt_relab_long_p2$first_na)),
         yaxis = list(
           title = "Phylum",
           tickvals = 1:length(unique(feat_filt_relab_long_p2$p)),
@@ -159,7 +173,7 @@ generate_plots <- function(match_level_counts,
       "#160A47",
       "#808080"
     )) +
-    labs(title = "Matching ASVs to MAGs",
+    labs(title = "Taxonomic classifications of ASVs that linked to MAGs",
         fill = "Match level",
          size = "% Relative Abundance") +
     xlab("Lowest level of ASV taxonomic classification") +
@@ -168,7 +182,7 @@ generate_plots <- function(match_level_counts,
   }
   
   # STACKED BAR CHARTS #############################################
-  plasma_palette <- viridis_pal(option = "plasma", direction = -1)(20)
+  plasma_palette <- viridis_pal(option = "plasma", direction = -1)(length(unique(feat_filt_relab_long$p)))
   
   p3 <- feat_filt_relab_long %>%
     # sum relabund for chart
@@ -177,7 +191,7 @@ generate_plots <- function(match_level_counts,
     ggplot(aes(x = Sample, y = Relabund, fill = p)) +
     geom_bar(stat = "identity") +
     theme_bw() +
-    labs(title = "Community composition per sample by ASV taxonomy", fill = "Phylum") +
+    labs(title = "ASV Community Composition", fill = "Phylum") +
     scale_fill_manual(values = plasma_palette) +
     guides(fill = guide_legend(ncol = 2)) +
     xlab("Sample") +
@@ -192,7 +206,7 @@ generate_plots <- function(match_level_counts,
     ggplot(aes(x = Sample, y = Relabund, fill = match_level)) +
     geom_bar(stat = "identity") +
     theme_bw() +
-    labs(title = "Proportion of ASV community that linked to MAGs", fill = "Taxonomic level match\nof ASV-MAG match") +
+    labs(title = "Proportion of community with linkages to MAGs", fill = "Taxonomic level \nof ASV-MAG match") +
     scale_fill_manual(
       values = c(
         "#F2671F",

@@ -50,10 +50,25 @@ td {
 }
 
 
-/* button hover color */
+/* button hover color on tool page */
 .btn-primary:hover {
     background: #94b674;
     border-color: #94b674;
     color: white;
+}
+
+button#run_tool:hover {
+    background: #457c96;
+    border: #457c96;
+}
+
+/* link color */
+
+a {
+  color: #f7bf4d;
+}
+
+a:hover {
+  color: #eda918;
 }
         

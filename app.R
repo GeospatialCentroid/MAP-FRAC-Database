@@ -155,7 +155,10 @@ ui <- fluidPage(
               checkboxGroupInput(
                 "salinity_class",
                 "Salinity Classification:",
-                choiceNames = c("Brine", "High", "Moderate", "Not Measured"),
+                choiceNames = c("Brine (conductivity >54.7 mS/cm)",
+                                "High (conductivity 15.6-54.6 mS/cm)",
+                                "Moderate  (conductivity 4.7-15.5 mS/cm) ", 
+                                "Not Measured"),
                 choiceValues = c("brine", "high", "moderate", "N/A"),
                 selected = c("brine", "high", "moderate", "N/A")
               )
@@ -233,6 +236,9 @@ ui <- fluidPage(
           leafletOutput("sample_map", height = "100%")
         )
       ), 
+      fluidRow(strong(style = "color: #a3a2a2", "NOTE: Geographic locations for wells and samples are not precise within a shale basin/play.")),
+      hr(),
+      h4("Explore samples by timeseries:"),
       card(height = 750,
            #card_header(HTML(paste("Click a point on the map to view time series", em("(if available)")))),
            #card_header(em("De-select basin names from the legend on the right to zoom to certain wells")),
@@ -243,18 +249,17 @@ ui <- fluidPage(
     ## Genome Explorer -----
     tabPanel(
       "Genome Explorer",
-      h4("Placeholder for subheader"),
-      navset_card_tab(
-        title = "",
+      h3("Explore shale microbiomes by taxonomy"),
+      h5(style = "color: #a3a2a2", "Select a taxonomic level and classification 
+         to explore the prevalence of a given taxa across shale basins."),
+      card(
         id = "nav_genome",
         full_screen = TRUE,
-        #height = 1000,
-        # layout_sidebar(
-        #   open = TRUE,
+        height = 1000,
+         layout_sidebar(
+           open = TRUE,
         sidebar = sidebar(
           position = "left",
-          conditionalPanel(
-            "input.nav_genome == 'MAG Relative Abundance'",
             selectizeInput(
               "max_abun_group",
               "Choose taxonomic level to summarize relative abundances by:",
@@ -296,28 +301,8 @@ ui <- fluidPage(
                                each basin/play."
             )
           ),
-          conditionalPanel(
-            "input.nav_genome == 'MAG Cores'",
-            radioGroupButtons(
-              "core_cutoff",
-              "Core MAGS defined as:",
-              choiceNames = c(">50% of samples per basin", ">70% of samples per basin"),
-              choiceValues = c(0.5, 0.7),
-              status = "primary"
-            )
-          )
-        ), 
-        nav_panel("MAG Relative Abundance",
-                  card(height = 600, leafletOutput("genome_map", height = "100%")),
-                  card(DT::dataTableOutput("abundance_table"))),
-        nav_panel("MAG Cores",
-                  card(height = 600, leafletOutput("cores_map", height = "100%")),
-                  card(DT::dataTableOutput("cores_table")))
-
-          
-          ),
-     
-      
+        leafletOutput("genome_map", height = "100%"))),
+        card(height = 600, DT::dataTableOutput("abundance_table"))
     ),
     
     ## Tool -----------
@@ -887,6 +872,8 @@ server <- function(input, output, session) {
       group_by(Basin, Play) %>% 
       summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
     inner_join(play_basin, by = c("Basin", "Play" = "Shale_play")) %>%
+      # edit play name for "Marcellus" to "Marcellus & Utica"
+      mutate(Play = if_else(Play == "Marcellus", "Marcellus & Utica", Play)) %>% 
     st_as_sf()
   })
   
@@ -953,7 +940,7 @@ server <- function(input, output, session) {
             "Basin:",
             basin_genome()$Basin,
             "<br>",
-            "Average MAG Relative Abundance:",
+            "Average % Relative Abundance:",
             round(basin_genome()$avg_rel_abundance, 2)
           )
         ) %>%
@@ -971,7 +958,7 @@ server <- function(input, output, session) {
             play_genome()$Play,
             "<br>",
             paste(
-              "Average MAG Relative Abundance:",
+              "Average % Relative Abundance:",
               round(play_genome()$avg_rel_abundance, 2)
             )
           )
@@ -993,103 +980,103 @@ server <- function(input, output, session) {
   output$abundance_table <- DT::renderDataTable(taxa_mod(),
                                                 options = list(paging = FALSE))
   
-  ### MAG Cores ------
-  
-  #### data for map
-  cores_map <- reactive({mag_cores %>% 
-    filter(perc_samples_present_per_basin >= input$core_cutoff) %>% 
-    group_by(basin) %>% 
-    count() %>% 
-    # join to shapefile
-    inner_join(sediment_basin, by = c("basin" = "NAME")) %>% 
-    st_as_sf()
-  })
-  
-  #### data for table
-  cores_table <- reactive({
-    mag_cores %>%
-      filter(perc_samples_present_per_basin >= input$core_cutoff)
-  })
-  
-  ## cores color palette
-  pal_cores <- reactive({
-    colorNumeric(
-      palette = c('#2cb2ba', '#94b674', '#fbb92d'),
-      domain = cores_map()$n
-    )
-  })
-  
-  # pull basin bounds for default view
-  bbox <- st_bbox(sediment_basin) %>% as.vector()
-  
-  output$cores_map <- leaflet::renderLeaflet({
-    leaflet() %>%
-      fitBounds(bbox[1], bbox[2], bbox[3], bbox[4]) %>% 
-      addProviderTiles("OpenStreetMap") %>%
-      # addMapPane("Basins", zIndex = 410) %>%
-      # addMapPane("Plays", zIndex = 420) %>%
-      addScaleBar(position = "bottomright") %>%
-      addLayersControl(
-        position = "bottomleft",
-        overlayGroups = c("Basins"),
-        options = layersControlOptions(collapsed = FALSE)
-      )
-  })
-  
-  observe({
+  # ### MAG Cores ------
+  # 
+  # #### data for map
+  # cores_map <- reactive({mag_cores %>% 
+  #   filter(perc_samples_present_per_basin >= input$core_cutoff) %>% 
+  #   group_by(basin) %>% 
+  #   count() %>% 
+  #   # join to shapefile
+  #   inner_join(sediment_basin, by = c("basin" = "NAME")) %>% 
+  #   st_as_sf()
+  # })
+  # 
+  # #### data for table
+  # cores_table <- reactive({
+  #   mag_cores %>%
+  #     filter(perc_samples_present_per_basin >= input$core_cutoff)
+  # })
+  # 
+  # ## cores color palette
+  # pal_cores <- reactive({
+  #   colorNumeric(
+  #     palette = c('#2cb2ba', '#94b674', '#fbb92d'),
+  #     domain = cores_map()$n
+  #   )
+  # })
+  # 
+  # # pull basin bounds for default view
+  # bbox <- st_bbox(sediment_basin) %>% as.vector()
+  # 
+  # output$cores_map <- leaflet::renderLeaflet({
+  #   leaflet() %>%
+  #     fitBounds(bbox[1], bbox[2], bbox[3], bbox[4]) %>% 
+  #     addProviderTiles("OpenStreetMap") %>%
+  #     # addMapPane("Basins", zIndex = 410) %>%
+  #     # addMapPane("Plays", zIndex = 420) %>%
+  #     addScaleBar(position = "bottomright") %>%
+  #     addLayersControl(
+  #       position = "bottomleft",
+  #       overlayGroups = c("Basins"),
+  #       options = layersControlOptions(collapsed = FALSE)
+  #     )
+  # })
+  # 
+  # observe({
+  #   
+  #   input$nav_genome
+  #   
+  #   leafletProxy('cores_map') %>%
+  #     clearGroup("Basins") %>%
+  #     clearControls() %>%
+  #     addPolygons(
+  #       group = "Basins",
+  #       data = cores_map(),
+  #       stroke = FALSE,
+  #       fillOpacity = 0.65,
+  #       fillColor = ~ pal_cores()(n),
+  #       popup = paste(
+  #         "Basin:",
+  #         cores_map()$basin,
+  #         "<br>",
+  #         "Number of MAG Cores:",
+  #         cores_map()$n
+  #       )
+  #     ) %>%
+  #     # addPolygons(
+  #     #   group = "Plays",
+  #     #   data = play_genome(),
+  #     #   stroke = FALSE,
+  #     #   fillOpacity = 0.85,
+  #     #   fillColor = ~ pal_genome_play()(avg_rel_abundance),
+  #     #   popup = paste(
+  #     #     "Basin:",
+  #     #     play_genome()$Basin,
+  #     #     "<br>",
+  #     #     "Play:",
+  #     #     play_genome()$Play,
+  #     #     "<br>",
+  #     #     paste(
+  #     #       "Average MAG Relative Abundance:",
+  #     #       round(play_genome()$avg_rel_abundance, 2)
+  #     #     )
+  #     #   )
+  #     # ) %>%
+  #     addLegend(
+  #       "bottomright",
+  #       data = cores_map(),
+  #       values = ~ n,
+  #       pal = pal_cores(),
+  #       title = "Number of <br/> MAG Cores"
+  #     ) 
+  #   
+  #   #### cores table ------
+  #   output$cores_table <- DT::renderDataTable(cores_table(),
+  #                                             options = list(paging = FALSE))
+  #   
     
-    input$nav_genome
-    
-    leafletProxy('cores_map') %>%
-      clearGroup("Basins") %>%
-      clearControls() %>%
-      addPolygons(
-        group = "Basins",
-        data = cores_map(),
-        stroke = FALSE,
-        fillOpacity = 0.65,
-        fillColor = ~ pal_cores()(n),
-        popup = paste(
-          "Basin:",
-          cores_map()$basin,
-          "<br>",
-          "Number of MAG Cores:",
-          cores_map()$n
-        )
-      ) %>%
-      # addPolygons(
-      #   group = "Plays",
-      #   data = play_genome(),
-      #   stroke = FALSE,
-      #   fillOpacity = 0.85,
-      #   fillColor = ~ pal_genome_play()(avg_rel_abundance),
-      #   popup = paste(
-      #     "Basin:",
-      #     play_genome()$Basin,
-      #     "<br>",
-      #     "Play:",
-      #     play_genome()$Play,
-      #     "<br>",
-      #     paste(
-      #       "Average MAG Relative Abundance:",
-      #       round(play_genome()$avg_rel_abundance, 2)
-      #     )
-      #   )
-      # ) %>%
-      addLegend(
-        "bottomright",
-        data = cores_map(),
-        values = ~ n,
-        pal = pal_cores(),
-        title = "Number of <br/> MAG Cores"
-      ) 
-    
-    #### cores table ------
-    output$cores_table <- DT::renderDataTable(cores_table(),
-                                              options = list(paging = FALSE))
-    
-    
-  })
+ # })
   
   
   # Tool -------------------------
@@ -1266,7 +1253,7 @@ server <- function(input, output, session) {
   output$report <- downloadHandler(
     
     filename = function() {
-      paste0("MAG_Matching_Tool_Report_", Sys.Date(), ".pdf")
+      paste0("MAG_Matching_Tool_Report_", Sys.time(), ".pdf")
     },
     content = function(file) {
       # render file in temp directory so .knit files don't go in app directory

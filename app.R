@@ -255,7 +255,7 @@ ui <- fluidPage(
       card(
         id = "nav_genome",
         full_screen = TRUE,
-        height = 1000,
+        height = 600,
          layout_sidebar(
            open = TRUE,
         sidebar = sidebar(

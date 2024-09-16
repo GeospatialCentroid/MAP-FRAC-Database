@@ -1284,8 +1284,27 @@ server <- function(input, output, session) {
       )
     }
   )
+  
+  
+  # Download Data -----------------------
 
-
+  ## this is not understanding 'tool_outputs()', need to fix
+  output$tool_data <- downloadHandler(
+    filename = function() {
+      paste0("linked_data_", Sys.time(), ".zip")
+    },
+    content = function(fname) {
+      write.csv(tool_outputs()$merged_data_OUTPUT, file = "merged_data.csv")
+      write.csv(tool_outputs()$match_level_counts, file = "match_level_counts.csv")
+      
+      zip(
+        zipfile = fname,
+        files = c("merged_data_output.csv", "match_level_counts.csv")
+      )
+    },
+    contentType = "application/zip"
+  )
+  
   
 }
 

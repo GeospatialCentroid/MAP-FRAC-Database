@@ -15,6 +15,7 @@ library(data.table)
 library(viridis)
 library(ggrepel)
 library(shinycssloaders)
+library(glue)
 #library(datamods)
 
 # source tool functions
@@ -1288,23 +1289,44 @@ server <- function(input, output, session) {
   
   # Download Data -----------------------
 
+  
+ observe({ 
+  
+  data_download <- reactive({
+    run_matching_tool(mag_file = mag_file, feat = user_data())
+  })
+  
+  
   ## this is not understanding 'tool_outputs()', need to fix
   output$tool_data <- downloadHandler(
     filename = function() {
       paste0("linked_data_", Sys.time(), ".zip")
     },
     content = function(fname) {
-      write.csv(tool_outputs()$merged_data_OUTPUT, file = "merged_data.csv")
-      write.csv(tool_outputs()$match_level_counts, file = "match_level_counts.csv")
+      temp_directory <- file.path(tempdir(), as.integer(Sys.time()))
+      dir.create(temp_directory)
       
-      zip(
+      data_download()[1:2] %>%
+        imap(function(x, y) {
+          if (!is.null(x)) {
+            file_name <- glue("{y}_data.csv")
+            readr::write_csv(x, file.path(temp_directory, file_name))
+          }
+        })
+      
+      
+      zip::zip(
         zipfile = fname,
-        files = c("merged_data_output.csv", "match_level_counts.csv")
+        files = dir(temp_directory),
+        root = temp_directory
       )
+      
     },
     contentType = "application/zip"
   )
   
+})
+ 
   
 }
 

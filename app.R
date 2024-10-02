@@ -1303,8 +1303,8 @@ server <- function(input, output, session) {
       paste0("linked_data_", Sys.time(), ".zip")
     },
     content = function(fname) {
-      temp_directory <- file.path(tempdir(), as.integer(Sys.time()))
-      dir.create(temp_directory)
+      temp_directory <- file.path(tempdir())
+      #dir.create(temp_directory)
       
       data_download()[1:2] %>%
         imap(function(x, y) {
@@ -1317,7 +1317,7 @@ server <- function(input, output, session) {
       
       zip::zip(
         zipfile = fname,
-        files = dir(temp_directory),
+        files = list.files(temp_directory, pattern = ".csv"),
         root = temp_directory
       )
       

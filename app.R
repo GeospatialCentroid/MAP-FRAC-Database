@@ -321,7 +321,8 @@ ui <- fluidPage(
           feature table from QIIME2 EMP Protocol, joined with taxonomic classifications of ASVs."),
         em("Note: taxonomic classifications of 16S amplicon sequences should be done using GTDB 
            ref 214 classifier to ensure the greatest number of linkages between ASVs and MAGs. 
-           Failure to use the GTDB classifier may result in minimal linkages between ASVs and MAGs."),
+           Failure to use the GTDB classifier may result in minimal linkages between ASVs and MAGs. 
+           Samples with insufficient ASV counts will be removed from this analysis."),
         a(href="EXAMPLE_feature_table_w_tax.txt", "Download Template .txt file", download = NA, target = "_blank"),
         fileInput("data_upload", "Upload 16S .txt file:", accept = ".txt"),
         tableOutput("data_preview")
@@ -337,6 +338,8 @@ ui <- fluidPage(
       )),
       fluidRow(
           card(height = "100%",
+               em(textOutput("learn_more")),
+               tags$style(type="text/css", "#learn_more {text-align:center; color: #94b674; font-size: 20px}"),
             card_body(
               layout_column_wrap(
             width = 1 / 2,
@@ -1105,6 +1108,7 @@ server <- function(input, output, session) {
     shinycssloaders::showPageSpinner(type = 1, color = "#94b674")
     Sys.sleep(3)
    
+    output$learn_more <- renderText({"Learn more about interpreting your MAP-FRAC linkage results by downloading the full report"})
 
     tool_outputs <- reactive({
       run_matching_tool(mag_file = mag_file, feat = user_data())

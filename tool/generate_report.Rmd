@@ -1,7 +1,7 @@
 ---
-title: "MAG Matching Tool Report"
+title: "MAP-FRAC database: MAG-linking tool report"
 output: pdf_document
-date: "Report generated on `r Sys.Date()` from https://geocentroid.shinyapps.io/MAP-FRAC-Database/"
+#date: "Report generated on `r Sys.Date()` from https://geocentroid.shinyapps.io/MAP-FRAC-Database/"
 params:
   mag_file: NA
   data: NA
@@ -26,7 +26,49 @@ ffrl <- tool_outputs$feat_filt_relab_long
 plots <- generate_plots(match_level_counts = mlc, feat_filt_relab_long = ffrl, interactive = FALSE)
 ```
 
+::: {.center data-latex=""}
+Report generated on `r Sys.Date()` from <https://geocentroid.shinyapps.io/MAP-FRAC-Database/>
+:::
+
+<br>
+
+::: {.center data-latex=""}
+## MAP-FRAC database version 1.0
+
+### Includes 978 unique medium- to high-quality shale MAGs
+:::
+
 ------------------------------------------------------------------------
+
+Important considerations for interpreting your results:  
+
+-   Samples that have low ASV counts (\<1000) will be removed from this analysis.  
+
+<!-- -->
+
+-   Taxonomic classifications of 16S amplicon sequences should be done using GTDB ref 214 classifier to ensure the greatest number of linkages between ASVs and MAGs. Failure to use the GTDB classifier may result in minimal linkages between ASVs and MAGs. 
+
+<!-- -->
+
+-   Linkages are made via matching taxonomic classifications between ASVs and MAGs. An ASV that does not classify past the “domain”, “phylum”, or “class” levels are considered to have insufficient information for linking. Linkages are made where full classification strings match at the order through species levels. “Full tax” indicates an exact match of the entire taxonomic string in both the ASV and MAG. 
+
+<!-- -->
+
+-   While some metabolisms are highly conserved within certain taxonomies (i.e. methanogenesis, dissimilatory reduction of sulfate via dsrAB), others are less taxonomically conserved (i.e. thiosulfate reduction via rhodanase, fermentation). Please use extra caution in extrapolating these results. 
+
+<!-- -->
+
+-   Please see [future-link-to-publication-or-github] for detailed information on how linkages are made between ASVs and MAGs. 
+
+<!-- -->
+
+-   Additional genomic information for MAGs that linked to your ASVs can be found by downloading data outputs from the MAG linking tool.  
+
+<br>
+
+#### **Total proportion of ASVs that linked to a MAG**
+
+Pie chart illustrates the total proportion of your ASVs that linked to a MAG at a given level of taxonomic classification. The higher level (i.e. full taxonomic match, genus, family) the stronger the link between ASV and MAG, and higher confidence in assigned metabolic function. ASVs that do not classify past the class-level are considered to have insufficient information for classification.
 
 ```{r plot1, out.width="100%", fig.height=6, fig.show='hold', fig.align='center'}
 plots$p1

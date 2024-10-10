@@ -10,27 +10,28 @@ generate_plots <- function(match_level_counts,
                    "NA")
   
   # PIE CHART ######################################################
-  match_level_counts <- match_level_counts %>%
-    mutate(
-      match_level = factor(match_level, levels = match_order),
-      # variable for pie chart
-      text_y = cumsum(count) - count / 2
-    )
-  
+  # match_level_counts_factored <- match_level_counts %>%
+  #   mutate(
+  #     match_level = factor(match_level, levels = match_order),
+  #     # variable for pie chart
+  #     text_y = cumsum(count) - count / 2
+  #   )
+  # 
   # this plot has to be created in plotly as ggplotly doesn't support polar coordinates
   if (interactive) {
     p1 <- plot_ly(
-      data = match_level_counts,
+      data = mutate(match_level_counts, match_level = factor(match_level, levels = match_order)) %>% arrange(match_level),
       labels =  ~ match_level,
       values =  ~ count,
       type = "pie",
+      sort = FALSE,
       marker = list(
         colors =  c(
-          "#f89540",
-          "#6a00a8",
-          "#f0f921",
-          "#0d0887",
           "#cc4778",
+          "#f89540",
+          "#f0f921",
+          "#6a00a8",
+          "#0d0887",
           "#808080"
         )
       )
@@ -48,12 +49,17 @@ generate_plots <- function(match_level_counts,
           zeroline = FALSE,
           showticklabels = FALSE
         ),
-        legend = list(title = list(text = "Taxonomic level<br>where the ASV <br>linked to a MAG")),
+        legend = list(title = list(text = "Taxonomic level<br>where the ASV <br>linked to a MAG"), traceorder = 'normal'),
         margin = list(l = 0, r = 0, b = 0, t = 50)
       )
     
   } else {
-    p1 <- ggplot(match_level_counts, aes(x = "", y = count, fill = match_level)) +
+    p1 <- match_level_counts %>%
+      arrange(desc(match_level)) %>%
+      mutate(#match_level = factor(match_level, levels = match_order),
+        # variable for pie chart
+        text_y = cumsum(count) - count / 2) %>%
+      ggplot(aes(x = "", y = count, fill = match_level)) +
       geom_bar(stat = "identity", width = 1) +
       scale_fill_manual(values = c(
         "#F2671F",
@@ -97,6 +103,7 @@ generate_plots <- function(match_level_counts,
     filter(Relabund > 0.05, !is.na(p)) %>%
     mutate(first_na = factor(first_na, levels = c("c", "o", "f", "g", "s"))) %>%
     mutate(match_level = factor(match_level, levels = match_order)) %>% 
+    mutate(p = str_remove(p, "p__")) %>% 
     filter(Relabund > 1) %>%
     mutate(
       # jittered_x = jitter(as.numeric(as.factor(first_na)), amount = 0.25),
@@ -126,7 +133,7 @@ generate_plots <- function(match_level_counts,
         type = 'scatter',
         mode = 'markers',
         color = ~match_level,
-        colors = c("#F2671F", "#C91B26", "#9C0F5F","#f0f921", "#990ac2", "#808080"),
+        colors = c("#9C0F5F", "#C91B26", "#F2671F","#f0f921", "#990ac2", "#808080"),
         marker = list(
           size = ~Relabund,
           opacity = 0.8,
@@ -155,7 +162,7 @@ generate_plots <- function(match_level_counts,
   } else {
   
   p2 <- ggplot(
-    feat_filt_relab_long_p2,
+    feat_filt_relab_long_p2 %>% mutate(p = str_remove(p, "p__")),
     aes(x = first_na, y = p, color = match_level)
   ) +
     geom_jitter(
@@ -174,7 +181,7 @@ generate_plots <- function(match_level_counts,
       "#808080"
     )) +
     labs(title = "Taxonomic classifications of ASVs that linked to MAGs",
-        fill = "Match level",
+        color = "Match level",
          size = "% Relative Abundance") +
     xlab("Lowest level of ASV taxonomic classification") +
     ylab("Phylum") +
@@ -188,6 +195,7 @@ generate_plots <- function(match_level_counts,
     # sum relabund for chart
     group_by(p, Sample) %>%
     summarize(Relabund = sum(Relabund, na.rm = TRUE)) %>%
+    mutate(p = str_remove(p, "p__")) %>% 
     ggplot(aes(x = Sample, y = Relabund, fill = p)) +
     geom_bar(stat = "identity") +
     theme_bw() +
@@ -209,14 +217,13 @@ generate_plots <- function(match_level_counts,
     labs(title = "Proportion of community with linkages to MAGs", fill = "Taxonomic level \nof ASV-MAG match") +
     scale_fill_manual(
       values = c(
-        "#F2671F",
-        "#C91B26",
-        "#9C0F5F",
-        "#60047A",
         "#160A47",
+        "#60047A",
+        "#9C0F5F",
+        "#C91B26",
+        "#F2671F",
         "#808080"
-      ),
-      limits = match_order
+      )
     ) +
     xlab("Sample") +
     ylab("% Relative Abundance") +

@@ -64,51 +64,102 @@ Important considerations for interpreting your results:  
 
 -   Additional genomic information for MAGs that linked to your ASVs can be found by downloading data outputs from the MAG linking tool.  
 
-<br>
+</br>
+\newpage
 
-#### **Total proportion of ASVs that linked to a MAG**
+## Total proportion of ASVs that linked to a MAG
+<br>
 
 Pie chart illustrates the total proportion of your ASVs that linked to a MAG at a given level of taxonomic classification. The higher level (i.e. full taxonomic match, genus, family) the stronger the link between ASV and MAG, and higher confidence in assigned metabolic function. ASVs that do not classify past the class-level are considered to have insufficient information for classification.
 
 ```{r plot1, out.width="100%", fig.height=6, fig.show='hold', fig.align='center'}
-plots$p1
+plots$p1 +
+  theme(plot.title = element_blank())
 ```
 
 </br>
+\newpage
+
+## Taxonomic classifications of ASVs that linked to MAGs
+
+<br>
+This plot illustrates the level of linkages between MAGs and ASVs for taxa within represented phyla. Every point indicates an ASV that linked at some level, sized by its relative abundance in a sample (one point for every observation of the ASV). The y axis shows the different phyla represented in the ASVs. The x axis shows which level of classification that a given ASV within a given phyla linked to a MAG. 
 
 ```{r plot2, out.width="100%", fig.height=5, fig.show='hold', fig.align='center'}
-plots$p2
+plots$p2 +
+   theme(plot.title = element_blank())
 
 ```
 
 </br>
+\newpage
+
+## ASV Community Composition
+
+<br>
+Barcharts plotting the community composition of the user-uploaded 16S data at the phylum level. Only samples that passed filtering are shown.  
 
 ```{r plot3, out.width="100%", fig.height=7, fig.show='hold', fig.align='center'}
 plots$p3 +
-  theme(legend.position = "bottom") +
-  guides(fill = guide_legend(ncol = 3, title.position = "top"))
+  theme(legend.position = "bottom",
+        plot.title = element_blank()) +
+  guides(fill = guide_legend(ncol = 4, title.position = "top"))
 ```
 
 </br>
+\newpage
+
+## Proportion of community with linkages to MAGs
+
+<br>
+
+Bar plots showing the proportion of the ASV profiled microbial community, shown in the previous bar chart, that link to the MAP-FRAC genome database and at which taxonomic level. 
 
 ```{r plot4, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
-plots$p4
+plots$p4 +
+  theme(legend.position = "bottom", plot.title = element_blank()) +
+  guides(fill = guide_legend(ncol = 6, title.position = "top")) +
+  labs(fill = "Taxonomic level of ASV-MAG match")
 ```
 
 </br>
+\newpage
+
+## Proportion of inferred sulfide producers
+
+<br>
+ 
+This plot shows the proportion of the microbial community that encodes the potential for sulfide production from either sulfate or thiosulfate as a result of ASV-MAG linking. ‘NA’ indicates the proportion of the community that did not link to a MAG and therefore no inferred genomic potential is available. 
 
 ```{r plot5, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
-plots$p5
+plots$p5 +
+   theme(plot.title = element_blank())
 ```
 
 </br>
+\newpage
+
+## Proportion of inferred acetate producers
+
+<br>
+
+This plot shows the proportion of the microbial community that encodes the potential for acetate production as a result of ASV-MAG linking. ‘NA’ indicates the proportion of the community that did not link to a MAG and therefore no inferred genomic potential is available.  
 
 ```{r plot6, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
-plots$p6
+plots$p6 +
+   theme(plot.title = element_blank())
 ```
 
 </br>
+\newpage
+
+## Proportion of inferred methanogens
+
+<br>
+
+This plot shows the proportion of the microbial community that encodes the potential for methanogenesis as a result of ASV-MAG linking. ‘NA’ indicates the proportion of the community that did not link to a MAG and therefore no inferred genomic potential is available. 
 
 ```{r plot7, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
-plots$p7
+plots$p7 +
+   theme(plot.title = element_blank())
 ```

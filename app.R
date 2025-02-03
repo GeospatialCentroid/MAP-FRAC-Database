@@ -324,6 +324,7 @@ ui <- fluidPage(
            Failure to use the GTDB classifier may result in minimal linkages between ASVs and MAGs. 
            Samples with insufficient ASV counts will be removed from this analysis."),
         a(href="EXAMPLE_feature_table_w_tax.txt", "Download Template .txt file", download = NA, target = "_blank"),
+        em("We recommend splitting large datasets into sets of ~30 samples to ensure graphical outputs from the linking tool are legible in the final report."),
         fileInput("data_upload", "Upload 16S .txt file:", accept = ".txt"),
         tableOutput("data_preview")
       ),

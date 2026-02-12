@@ -1,4 +1,4 @@
-# MAP-FRAC-Database
+# Interactively Explore the MAP-FRAC Database
 
 This repository houses the underlying data and scripts for the MAP-FRAC Shiny App. You can explore the MAP-FRAC database and MAG-linking tool here: [**https://apps.gis.colostate.edu/MAP-FRAC-Database/**](https://apps.gis.colostate.edu/MAP-FRAC-Database/)
 

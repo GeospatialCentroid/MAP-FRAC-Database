@@ -189,7 +189,7 @@ generate_plots <- function(match_level_counts,
   }
   
   # STACKED BAR CHARTS #############################################
-  plasma_palette <- viridis_pal(option = "plasma", direction = -1)(length(unique(feat_filt_relab_long$p)))
+ plasma_palette <- viridis_pal(option = "plasma", direction = -1)(length(unique(feat_filt_relab_long$p)))
   
   p3 <- feat_filt_relab_long %>%
     # sum relabund for chart
@@ -230,31 +230,54 @@ generate_plots <- function(match_level_counts,
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
   # FUNCTIONAL STACKED BAR CHARTS ##################################
-  p5 <- feat_filt_relab_long %>%
-    group_by(Sample, sPROD) %>%
+  
+  ## updated data cleaning for new data structure
+  feat_filt_relab_long3 <- feat_filt_relab_long %>%
+    rowwise() %>%
+    mutate(S_pathway = case_when(
+      sPROD == FALSE ~ "FALSE",
+      is.na(sPROD) ~ NA_character_,
+      sPROD == TRUE ~ {
+        genes <- c()
+        if (isTRUE(rhodanase)) genes <- c(genes, "rhodanase")
+        if (isTRUE(dsrB)) genes <- c(genes, "dsrB")
+        if (isTRUE(phsA)) genes <- c(genes, "phsA")
+        if (length(genes) == 0) "TRUE (no genes)" else paste(genes, collapse = ", ")
+      }
+    )) %>%
+    ungroup() %>% 
+  # Arrange positions of categories
+    mutate(S_pathway = factor(S_pathway, 
+                              levels = c(NA, "FALSE", 
+                                         sort(unique(S_pathway[!is.na(S_pathway) & S_pathway != "FALSE"])))))
+  
+  p5 <- feat_filt_relab_long3 %>%
+    group_by(Sample, S_pathway) %>%
     summarise(Relabund = sum(Relabund, na.rm = TRUE)) %>%
-    ggplot(aes(x = Sample, y = Relabund, fill = sPROD)) +
+    ggplot(aes(x = Sample, y = Relabund, fill = S_pathway)) +
     geom_bar(stat = "identity") +
     theme_bw() +
-    labs(title = "Proportion of inferred sulfide producers", fill = "Potential for\nsulfide production") +
+    labs(title = "Proportion of inferred sulfide producers",
+         fill = "Sulfide production\npathway") + 
     xlab("Sample") +
     ylab("% Relative Abundance") +
-    scale_fill_manual(values = c("#d3d3d3", "#0F52BA", "#434343")) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    scale_fill_manual(values = c("#d3d3d3", "#008080", "#b4c7a8", "#70a494", "#ca5828", "#f6ebbc", "#dd8a58", "grey30")) +
+    theme(axis.text.x=element_text(angle = 45, hjust = 1))
   
-  p6 <- feat_filt_relab_long %>%
-    group_by(Sample, acetatePROD) %>%
-    summarise(Relabund = sum(Relabund, na.rm = TRUE)) %>%
-    ggplot(aes(x = Sample, y = Relabund, fill = acetatePROD)) +
-    geom_bar(stat = "identity") +
-    theme_bw() +
-    labs(title = "Proportion of inferred acetate producers", fill = "Potential for\nacetate production") +
-    xlab("Sample") +
-    ylab("% Relative Abundance") +
-    scale_fill_manual(values = c("#d3d3d3", "#DE3163", "#434343")) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  ## remove this figure
+  # p6 <- feat_filt_relab_long %>%
+  #   group_by(Sample, acetatePROD) %>%
+  #   summarise(Relabund = sum(Relabund, na.rm = TRUE)) %>%
+  #   ggplot(aes(x = Sample, y = Relabund, fill = acetatePROD)) +
+  #   geom_bar(stat = "identity") +
+  #   theme_bw() +
+  #   labs(title = "Proportion of inferred acetate producers", fill = "Potential for\nacetate production") +
+  #   xlab("Sample") +
+  #   ylab("% Relative Abundance") +
+  #   scale_fill_manual(values = c("#d3d3d3", "#DE3163", "#434343")) +
+  #   theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
-  p7 <- feat_filt_relab_long %>%
+  p6 <- feat_filt_relab_long3 %>%
     group_by(Sample, METHANO) %>%
     summarise(Relabund = sum(Relabund, na.rm = TRUE)) %>%
     ggplot(aes(x = Sample, y = Relabund, fill = METHANO)) +
@@ -275,14 +298,21 @@ generate_plots <- function(match_level_counts,
   # ggsave("p7_ASV_function_acetate.pdf", plot = p6)
   # ggsave("p8_ASV_function_methanogens.pdf", plot = p7)
   
+  # convert to plotly if interactive
+  # if (interactive) {
+  #   p3 <- ggplotly(p3)
+  #   p4 <- ggplotly(p4)
+  #   p5 <- ggplotly(p5)
+  #   p6 <- ggplotly(p6)
+  # }
+  
   list(
     p1 = p1,
     p2 = p2,
     p3 = p3,
     p4 = p4,
     p5 = p5,
-    p6 = p6,
-    p7 = p7
+    p6 = p6
   )
 }
 

@@ -32,7 +32,7 @@ source)
 load("data/app_data_Update.RData")
 
 # read in mag file for tool
-mag_file <- read.delim("tool/shale_MAGS_978.txt", header = TRUE)
+mag_file <- read.delim("tool/shale_MAGS_978_v2_02.17.2026.txt", header = TRUE)
 
 # create color palettes (this is a hacky way based on alphabetical order of basin names)
 pal_basin <- colorFactor(
@@ -52,10 +52,6 @@ pal_play <- colorFactor(
 pal_salinity <- colorNumeric(palette = "Reds", domain = sample_app$salinity_conductivity_m_s_cm)
 
 
-
-# jitter well locations for sample map
-# sample_app <- st_jitter(sample_app, factor = 0.005) %>% 
-#   st_transform(crs = 4326)
 
 # for now, create string of basin names that does not include international ones
 basin_names <- sample_app %>% 
@@ -350,8 +346,7 @@ ui <- fluidPage(
           plotlyOutput("p3"),
           plotlyOutput("p4"),
           plotlyOutput("p5"),
-          plotlyOutput("p6"),
-          plotlyOutput("p7"))
+          plotlyOutput("p6"))
             )
         ),
         hr(),
@@ -366,7 +361,8 @@ ui <- fluidPage(
 # Define server -----------------
 server <- function(input, output, session) {
   
-
+# Sample Explorer -------------------------------
+  
   ## reactive sample data -----------
   
   ## Create static jitter points
@@ -460,26 +456,6 @@ server <- function(input, output, session) {
      }
      
    })
-    
-  # observeEvent(input$salinity_range, {
-  #   print(input$salinity_range[1])
-  #   print(input$salinity_range[2])
-  # })
-   
-   ## jitter points for 2 zoom levels
-   
-   # sample_jitter1 <- reactive({
-   #   # if(nrow(sample_filtered()>0)) {
-   #   st_jitter(sample_filtered(), factor = 0.015) %>%
-   #     st_transform(crs = 4326)
-   #   # }
-   # })
-   # 
-   # sample_jitter2 <- reactive({
-   #   st_jitter(sample_filtered(), factor = 0.005) %>%
-   #     st_transform(crs = 4326)
-   # })
-   # 
   
   
   ## time series plotly ----
@@ -550,15 +526,10 @@ server <- function(input, output, session) {
           "#B796C6"
         ),
         name = ~ sample_app$shale_basin,
-        #legendgroup = ~ sample_app$shale_basin,
         type = 'scatter',
         mode = 'lines+markers',
         connectgaps = TRUE
-      ) #%>%
-    # layout(showlegend = TRUE,
-    #        xaxis = list(title = "Days Since Frack")) %>%
-    # style(showlegend = FALSE,
-    #       traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28))
+      ) 
     
     subplot(
       fig_1,
@@ -591,7 +562,6 @@ server <- function(input, output, session) {
         stroke = FALSE,
         fillOpacity = 0.65,
         fillColor = ~ pal_basin(NAME),
-        #fillColor = "#91B187",
         options = pathOptions(pane = "Basins"),
         popup = paste("Basin:",
                       sediment_basin$NAME)
@@ -884,7 +854,7 @@ server <- function(input, output, session) {
 
  
   
-  ## Genome Map -----
+# Genome Explorer -----------------
    
    ### genome filter ----------------
    taxa_mod <- callModule(
@@ -1174,6 +1144,7 @@ server <- function(input, output, session) {
       )
     })
     
+  
 
     output$data_output <- DT::renderDataTable(
       tool_outputs()$merged_data_OUTPUT,
@@ -1218,7 +1189,7 @@ server <- function(input, output, session) {
           #transparent legend bg
           legend.box.background = element_rect(fill = 'transparent')
         )
-      
+
       ggplotly(p3)
       
     })
@@ -1281,24 +1252,24 @@ server <- function(input, output, session) {
     })
     
     
-    output$p7 <- renderPlotly({
-      p7 <-  plots()$p7 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
-        )
-      
-      ggplotly(p7)
-      
-    })
-    
+    # output$p7 <- renderPlotly({
+    #   p7 <-  plots()$p7 +
+    #     theme(
+    #       text = element_text(color = "white"),
+    #       axis.text = element_text(color = "white"),
+    #       panel.background = element_rect(fill = 'transparent'),
+    #       #transparent panel bg
+    #       plot.background = element_rect(fill = 'transparent', color =
+    #                                        NA),
+    #       legend.background = element_rect(fill = 'transparent'),
+    #       #transparent legend bg
+    #       legend.box.background = element_rect(fill = 'transparent')
+    #     )
+    #   
+    #   ggplotly(p7)
+    #   
+    # })
+    # 
     shinycssloaders::hidePageSpinner()
     
     

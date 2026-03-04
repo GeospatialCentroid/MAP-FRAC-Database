@@ -103,11 +103,14 @@ run_matching_tool <- function(mag_file, feat) {
     pivot_longer(cols = 2:(ncol(feat_filt_relab) - 1), names_to = "Sample", values_to = "Relabund") %>%
     separate(taxonomy, into = c("d", "p", "c", "o", "f", "g", "s"), sep = ";", remove = FALSE) %>%
     left_join(merged_data %>% select(ASV, MAG, match_level), by = "ASV") %>%
-    left_join(mags %>% select(MAG, basin, compl, contam, sPROD, acetatePROD, METHANO), by = "MAG")
+    left_join(
+      mags %>% select(MAG, basin, compl, contam, sPROD, METHANO, rhodanase, phsA, dsrB),
+      by = "MAG")
   
   # Final merged data
   merged_data_FINAL <- merged_data %>%
-    left_join(mags %>% select(MAG, basin, compl, contam, sPROD, acetatePROD, METHANO), by = "MAG") %>%
+    left_join(mags %>% select(MAG, basin, compl, contam, sPROD, METHANO, rhodanase, phsA, dsrB),
+              by = "MAG") %>%
     arrange(match_level)
   
   merged_data_OUTPUT <- merged_data_FINAL %>%

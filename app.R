@@ -369,11 +369,21 @@ server <- function(input, output, session) {
 
   ## reactive sample data -----------
   
-   sample_filtered <- reactive({
+  ## Create static jitter points
+  sample_app1 <- sample_app %>% 
+    st_jitter(factor = 0.015) %>%
+    st_transform(crs = 4326)
+  
+  sample_app2 <- sample_app %>% 
+    st_jitter(factor = 0.005) %>%
+    st_transform(crs = 4326)
+    
+  ## Filter for each jittered dataset
+   sample_filtered1 <- reactive({
      if (input$point_type == "Wells") {
        req(input$time_series)
        if (input$time_series == "Show All Samples") {
-         sample_app %>%
+         sample_app1 %>%
            filter(salinity_classification %in% input$salinity_class) %>% 
            # count # samples per well
            group_by(well_id) %>%
@@ -381,7 +391,7 @@ server <- function(input, output, session) {
            distinct(well_id, .keep_all = TRUE) %>%
            ungroup()
        } else if (input$time_series == "Yes") {
-         sample_app %>%
+         sample_app1 %>%
            filter(timeseries_stage %in% input$time_category,
                   salinity_classification %in% input$salinity_class) %>%
            # count # samples per well
@@ -390,7 +400,7 @@ server <- function(input, output, session) {
            distinct(well_id, .keep_all = TRUE) %>%
            ungroup()
        } else {
-         sample_app %>%
+         sample_app1 %>%
            filter(timeseries_stage == "none",
                   salinity_classification %in% input$salinity_class) %>%
            # count # samples per well
@@ -401,13 +411,54 @@ server <- function(input, output, session) {
        }
        
      } else {
-       sample_app %>% 
+       sample_app1 %>% 
          filter(salinity_conductivity_m_s_cm %inrange% input$salinity_range,
                 perc_sulfide_producers %inrange% input$sulfide_range,
                 perc_acetate_producers %inrange% input$acetate_range,
                 perc_methanogens %inrange% input$methanogen_range)
      }
     
+   })
+   
+   sample_filtered2 <- reactive({
+     if (input$point_type == "Wells") {
+       req(input$time_series)
+       if (input$time_series == "Show All Samples") {
+         sample_app2 %>%
+           filter(salinity_classification %in% input$salinity_class) %>% 
+           # count # samples per well
+           group_by(well_id) %>%
+           mutate(n_samples = n()) %>%
+           distinct(well_id, .keep_all = TRUE) %>%
+           ungroup()
+       } else if (input$time_series == "Yes") {
+         sample_app2 %>%
+           filter(timeseries_stage %in% input$time_category,
+                  salinity_classification %in% input$salinity_class) %>%
+           # count # samples per well
+           group_by(well_id) %>%
+           mutate(n_samples = n()) %>%
+           distinct(well_id, .keep_all = TRUE) %>%
+           ungroup()
+       } else {
+         sample_app2 %>%
+           filter(timeseries_stage == "none",
+                  salinity_classification %in% input$salinity_class) %>%
+           # count # samples per well
+           group_by(well_id) %>%
+           mutate(n_samples = n()) %>%
+           distinct(well_id, .keep_all = TRUE) %>%
+           ungroup()
+       }
+       
+     } else {
+       sample_app2 %>% 
+         filter(salinity_conductivity_m_s_cm %inrange% input$salinity_range,
+                perc_sulfide_producers %inrange% input$sulfide_range,
+                perc_acetate_producers %inrange% input$acetate_range,
+                perc_methanogens %inrange% input$methanogen_range)
+     }
+     
    })
     
   # observeEvent(input$salinity_range, {
@@ -417,18 +468,18 @@ server <- function(input, output, session) {
    
    ## jitter points for 2 zoom levels
    
-   sample_jitter1 <- reactive({
-     # if(nrow(sample_filtered()>0)) {
-     st_jitter(sample_filtered(), factor = 0.015) %>%
-       st_transform(crs = 4326)
-     # }
-   })
-   
-   sample_jitter2 <- reactive({
-     st_jitter(sample_filtered(), factor = 0.005) %>%
-       st_transform(crs = 4326)
-   })
- 
+   # sample_jitter1 <- reactive({
+   #   # if(nrow(sample_filtered()>0)) {
+   #   st_jitter(sample_filtered(), factor = 0.015) %>%
+   #     st_transform(crs = 4326)
+   #   # }
+   # })
+   # 
+   # sample_jitter2 <- reactive({
+   #   st_jitter(sample_filtered(), factor = 0.005) %>%
+   #     st_transform(crs = 4326)
+   # })
+   # 
   
   
   ## time series plotly ----
@@ -603,7 +654,7 @@ server <- function(input, output, session) {
    observe({
      input$nav
      #observeEvent(sample_filtered(), {
-     if (nrow(sample_filtered()) == 0 | is.null(sample_filtered())) {
+     if (nrow(sample_filtered1()) == 0 | is.null(sample_filtered1())) {
        leafletProxy('sample_map') %>%
          clearGroup(c("Wells", "jitter2")) %>%
          clearControls()
@@ -612,7 +663,7 @@ server <- function(input, output, session) {
          clearGroup(c("Wells", "jitter2")) %>%
          clearControls() %>%
          addCircleMarkers(
-           data = sample_jitter1(),
+           data = sample_filtered1(),
            group = "Wells",
            radius = if (input$point_type == "Wells") {
              ~ sqrt(n_samples) * 3
@@ -620,7 +671,7 @@ server <- function(input, output, session) {
              if (input$sample_var_size == "") {
                6
              } else {
-               ~ sqrt(sample_jitter1()[[input$sample_var_size]])
+               ~ sqrt(sample_filtered1()[[input$sample_var_size]])
              }
            },
        #radius = ~ sqrt(n_samples) * 3,
@@ -634,61 +685,61 @@ server <- function(input, output, session) {
            popup =  if (input$point_type == "Wells") {
              paste(
                "Well:",
-               sample_filtered()$well_id,
+               sample_filtered1()$well_id,
                "<br>",
-               paste("Basin:", sample_filtered()$shale_basin),
+               paste("Basin:", sample_filtered1()$shale_basin),
                "<br>",
-               paste("Play:", sample_filtered()$shale_play),
+               paste("Play:", sample_filtered1()$shale_play),
                "<br>",
-               paste("Number of Samples:", sample_filtered()$n_samples),
+               paste("Number of Samples:", sample_filtered1()$n_samples),
                "<br>",
                paste(
                  "Range of days since frack:",
                  paste0(
-                   sample_filtered()$min_days_since_frack,
+                   sample_filtered1()$min_days_since_frack,
                    "-",
-                   sample_filtered()$max_days_since_frack
+                   sample_filtered1()$max_days_since_frack
                  )
                ),
-               '<img src=', paste0(sample_filtered()$well_id, "_area_plot.png"),
+               '<img src=', paste0(sample_filtered1()$well_id, "_area_plot.png"),
                ' width="300"',
                '>'
              )
            } else {
              paste(
                "Well:",
-               sample_filtered()$well_id,
+               sample_filtered1()$well_id,
                "<br>",
-               paste("Sample:", sample_filtered()$sample_id),
+               paste("Sample:", sample_filtered1()$sample_id),
                "<br>",
                paste(
                  "Time Series Stage:",
-                 sample_filtered()$timeseries_stage
+                 sample_filtered1()$timeseries_stage
                ),
                "<br>",
                paste(
                  "Salinity Classification:",
-                 sample_filtered()$salinity_classification
+                 sample_filtered1()$salinity_classification
                ),
                "<br>",
                paste(
                  "Salinity Conductivity (mS/cm):",
-                 round(sample_filtered()$salinity_conductivity_m_s_cm)
+                 round(sample_filtered1()$salinity_conductivity_m_s_cm)
                ),
                "<br>",
                paste(
                  "Percent Sulfide Producers:",
-                 round(sample_filtered()$perc_sulfide_producers)
+                 round(sample_filtered1()$perc_sulfide_producers)
                ),
                "<br>",
                paste(
                  "Percent Acetate Producers:",
-                 round(sample_filtered()$perc_acetate_producers)
+                 round(sample_filtered1()$perc_acetate_producers)
                ),
                "<br>",
                paste(
                  "Percent Methanogens:",
-                 round(sample_filtered()$perc_methanogens)
+                 round(sample_filtered1()$perc_methanogens)
                )
                # '<img src=', paste0(sample_filtered()$well_id, "_area_plot.png"),
                # ' width="300"',
@@ -697,7 +748,7 @@ server <- function(input, output, session) {
            }
          ) %>%
          addCircleMarkers(
-           data = sample_jitter2(),
+           data = sample_filtered2(),
            group = "jitter2",
            radius = if (input$point_type == "Wells") {
              ~ sqrt(n_samples) * 3
@@ -705,7 +756,7 @@ server <- function(input, output, session) {
              if (input$sample_var_size == "") {
                6
              } else {
-               ~ sqrt(sample_jitter1()[[input$sample_var_size]])
+               ~ sqrt(sample_filtered2()[[input$sample_var_size]])
              }
            },
            #radius = ~ sqrt(n_samples) * 3,
@@ -718,58 +769,58 @@ server <- function(input, output, session) {
            popup =  if (input$point_type == "Wells") {
              paste(
                "Well:",
-               sample_filtered()$well_id,
+               sample_filtered2()$well_id,
                "<br>",
-               paste("Basin:", sample_filtered()$shale_basin),
+               paste("Basin:", sample_filtered2()$shale_basin),
                "<br>",
-               paste("Play:", sample_filtered()$shale_play),
+               paste("Play:", sample_filtered2()$shale_play),
                "<br>",
-               paste("Number of Samples:", sample_filtered()$n_samples),
+               paste("Number of Samples:", sample_filtered2()$n_samples),
                "<br>",
                paste(
                  "Range of days since frack:",
                  paste0(
-                   sample_filtered()$min_days_since_frack,
+                   sample_filtered2()$min_days_since_frack,
                    "-",
-                   sample_filtered()$max_days_since_frack
+                   sample_filtered2()$max_days_since_frack
                  )
                )
              )
            } else {
              paste(
                "Well:",
-               sample_filtered()$well_id,
+               sample_filtered2()$well_id,
                "<br>",
-               paste("Sample:", sample_filtered()$sample_id),
+               paste("Sample:", sample_filtered2()$sample_id),
                "<br>",
                paste(
                  "Time Series Stage:",
-                 sample_filtered()$timeseries_stage
+                 sample_filtered2()$timeseries_stage
                ),
                "<br>",
                paste(
                  "Salinity Classification:",
-                 sample_filtered()$salinity_classification
+                 sample_filtered2()$salinity_classification
                ),
                "<br>",
                paste(
                  "Salinity Conductivity (mS/cm):",
-                 round(sample_filtered()$salinity_conductivity_m_s_cm)
+                 round(sample_filtered2()$salinity_conductivity_m_s_cm)
                ),
                "<br>",
                paste(
                  "Percent Sulfide Producers:",
-                 round(sample_filtered()$perc_sulfide_producers)
+                 round(sample_filtered2()$perc_sulfide_producers)
                ),
                "<br>",
                paste(
                  "Percent Acetate Producers:",
-                 round(sample_filtered()$perc_acetate_producers)
+                 round(sample_filtered2()$perc_acetate_producers)
                ),
                "<br>",
                paste(
                  "Percent Methanogens:",
-                 round(sample_filtered()$perc_methanogens)
+                 round(sample_filtered2()$perc_methanogens)
                )
              )
            }
@@ -778,9 +829,9 @@ server <- function(input, output, session) {
          groupOptions("jitter2", zoomLevels = 7:20) %>%
          addLegendSize(
            values = if (input$point_type == "Wells") {
-             sample_filtered()$n_samples
+             sample_filtered1()$n_samples
            } else {
-             sample_filtered()[[input$sample_var_size]]
+             sample_filtered1()[[input$sample_var_size]]
            },
            color = 'white',
            fillColor = 'white',

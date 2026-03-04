@@ -10,9 +10,9 @@
 }
 
 /* change navbar color */
-/*.navbar-static-top {background-color: #1d404a}
-.navbar-default .navbar-nav>.active>a {background-color: #4d706f;} */
-
+nav.navbar.navbar-default.navbar-static-top {
+    background-color: #7198ab !important;
+}
 
 /* hacky way to make leaflet darktheme */
 .leaflet-layer,

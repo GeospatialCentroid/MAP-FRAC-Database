@@ -1,7 +1,7 @@
 ---
 title: "MAP-FRAC database: MAG-linking tool report"
 output: pdf_document
-#date: "Report generated on `r Sys.Date()` from https://geocentroid.shinyapps.io/MAP-FRAC-Database/"
+#date: "Report generated on `r Sys.Date()` from https://apps.gis.colostate.edu/MAP-FRAC-Database/"
 params:
   mag_file: NA
   data: NA
@@ -27,7 +27,7 @@ plots <- generate_plots(match_level_counts = mlc, feat_filt_relab_long = ffrl, i
 ```
 
 ::: {.center data-latex=""}
-Report generated on `r Sys.Date()` from <https://geocentroid.shinyapps.io/MAP-FRAC-Database/>
+Report generated on `r Sys.Date()` from <https://apps.gis.colostate.edu/MAP-FRAC-Database/>
 :::
 
 <br>
@@ -58,7 +58,7 @@ Important considerations for interpreting your results:  
 
 <!-- -->
 
--   Please see [future-link-to-publication-or-github] for detailed information on how linkages are made between ASVs and MAGs. 
+-   Please see [https://github.com/kkamundson/shale_biogeo/tree/main/MAG_linking_tool](https://github.com/kkamundson/shale_biogeo/tree/main/MAG_linking_tool) for detailed information on how linkages are made between ASVs and MAGs. 
 
 <!-- -->
 
@@ -129,7 +129,7 @@ plots$p4 +
 
 <br>
  
-This plot shows the proportion of the microbial community that encodes the potential for sulfide production from either sulfate or thiosulfate as a result of ASV-MAG linking. ‘NA’ indicates the proportion of the community that did not link to a MAG and therefore no inferred genomic potential is available. 
+This plot shows the proportion of the microbial community that encodes the inferred potential for sulfide production from either sulfate or thiosulfate as a result of ASV-MAG linking. The potential for sulfide production through different pathways is displayed: rhodanase (thiosulfate reduction), thiosulfate reductase (phsA, thiosulfate reduction), and dissimilatory sulfite reductase (dsrB, sulfate reduction). Here, ‘NA’ indicates the proportion of the community that did not link to a MAG and therefore no inferred genomic potential is available. 
 
 ```{r plot5, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
 plots$p5 +
@@ -139,19 +139,6 @@ plots$p5 +
 </br>
 \newpage
 
-## Proportion of inferred acetate producers
-
-<br>
-
-This plot shows the proportion of the microbial community that encodes the potential for acetate production as a result of ASV-MAG linking. ‘NA’ indicates the proportion of the community that did not link to a MAG and therefore no inferred genomic potential is available.  
-
-```{r plot6, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
-plots$p6 +
-   theme(plot.title = element_blank())
-```
-
-</br>
-\newpage
 
 ## Proportion of inferred methanogens
 
@@ -159,7 +146,7 @@ plots$p6 +
 
 This plot shows the proportion of the microbial community that encodes the potential for methanogenesis as a result of ASV-MAG linking. ‘NA’ indicates the proportion of the community that did not link to a MAG and therefore no inferred genomic potential is available. 
 
-```{r plot7, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
-plots$p7 +
+```{r plot6, out.width="100%", fig.height=4, fig.show='hold', fig.align='center'}
+plots$p6 +
    theme(plot.title = element_blank())
 ```

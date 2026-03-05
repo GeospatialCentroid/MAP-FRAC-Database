@@ -16,7 +16,10 @@ library(viridis)
 library(ggrepel)
 library(shinycssloaders)
 library(glue)
-#library(datamods)
+library(future)
+library(promises)
+plan(multisession)
+
 
 # source tool functions
 purrr::map(list.files(
@@ -32,7 +35,7 @@ source)
 load("data/app_data_Update.RData")
 
 # read in mag file for tool
-mag_file <- read.delim("tool/shale_MAGS_978.txt", header = TRUE)
+mag_file <- read.delim("tool/shale_MAGS_978_v2_02.17.2026.txt", header = TRUE)
 
 # create color palettes (this is a hacky way based on alphabetical order of basin names)
 pal_basin <- colorFactor(
@@ -52,10 +55,6 @@ pal_play <- colorFactor(
 pal_salinity <- colorNumeric(palette = "Reds", domain = sample_app$salinity_conductivity_m_s_cm)
 
 
-
-# jitter well locations for sample map
-# sample_app <- st_jitter(sample_app, factor = 0.005) %>% 
-#   st_transform(crs = 4326)
 
 # for now, create string of basin names that does not include international ones
 basin_names <- sample_app %>% 
@@ -350,8 +349,7 @@ ui <- fluidPage(
           plotlyOutput("p3"),
           plotlyOutput("p4"),
           plotlyOutput("p5"),
-          plotlyOutput("p6"),
-          plotlyOutput("p7"))
+          plotlyOutput("p6"))
             )
         ),
         hr(),
@@ -360,20 +358,71 @@ ui <- fluidPage(
           DT::dataTableOutput("data_output", height = "200px"))
       )
     )
+  ),
+  hr(),
+  div(
+    class = "pt-2",
+    div(
+      class = "row justify-content-center",
+      # Left column - Logo and developer info
+      div(
+        class = "col-md-6 text-center mb-3",
+        p(
+          style = "color: #CCCCCC; margin-bottom: 10px; font-size: 0.85rem;",
+          paste("Application developed by the Geospatial Centroid at CSU. Last Updated", format(Sys.Date(), "%B %Y"))
+        ),
+        tags$img(
+          src = "Centroid_logo.png",
+          alt = "Geospatial Centroid Logo",
+          style = "max-width: 200px; height: auto;"
+        )
+      ),
+      # Right column - Citation and contact
+      div(
+        class = "col-md-6 text-center",
+        p(
+          style = "color: #CCCCCC; margin-bottom: 10px; font-size: 0.85rem;",
+          tags$strong("Citation: "),
+          "Amundson et al. al 2026 ",
+          tags$em("(Under Review)")
+        ),
+        p(
+          style = "color: #CCCCCC; font-size: 0.85rem;",
+          tags$strong("Contact: "),
+          "Kaela Amundson, ",
+          tags$a(
+            href = "mailto:Kaela.Amundson@colostate.edu",
+            "Kaela.Amundson@colostate.edu",
+            style = "color: #00bc8c;"
+          )
+        )
+      )
+    )
   )
 )
 
 # Define server -----------------
 server <- function(input, output, session) {
   
-
+# Sample Explorer -------------------------------
+  
   ## reactive sample data -----------
   
-   sample_filtered <- reactive({
+  ## Create static jitter points
+  sample_app1 <- sample_app %>% 
+    st_jitter(factor = 0.015) %>%
+    st_transform(crs = 4326)
+  
+  sample_app2 <- sample_app %>% 
+    st_jitter(factor = 0.005) %>%
+    st_transform(crs = 4326)
+    
+  ## Filter for each jittered dataset
+   sample_filtered1 <- reactive({
      if (input$point_type == "Wells") {
        req(input$time_series)
        if (input$time_series == "Show All Samples") {
-         sample_app %>%
+         sample_app1 %>%
            filter(salinity_classification %in% input$salinity_class) %>% 
            # count # samples per well
            group_by(well_id) %>%
@@ -381,7 +430,7 @@ server <- function(input, output, session) {
            distinct(well_id, .keep_all = TRUE) %>%
            ungroup()
        } else if (input$time_series == "Yes") {
-         sample_app %>%
+         sample_app1 %>%
            filter(timeseries_stage %in% input$time_category,
                   salinity_classification %in% input$salinity_class) %>%
            # count # samples per well
@@ -390,7 +439,7 @@ server <- function(input, output, session) {
            distinct(well_id, .keep_all = TRUE) %>%
            ungroup()
        } else {
-         sample_app %>%
+         sample_app1 %>%
            filter(timeseries_stage == "none",
                   salinity_classification %in% input$salinity_class) %>%
            # count # samples per well
@@ -401,7 +450,7 @@ server <- function(input, output, session) {
        }
        
      } else {
-       sample_app %>% 
+       sample_app1 %>% 
          filter(salinity_conductivity_m_s_cm %inrange% input$salinity_range,
                 perc_sulfide_producers %inrange% input$sulfide_range,
                 perc_acetate_producers %inrange% input$acetate_range,
@@ -409,26 +458,47 @@ server <- function(input, output, session) {
      }
     
    })
-    
-  # observeEvent(input$salinity_range, {
-  #   print(input$salinity_range[1])
-  #   print(input$salinity_range[2])
-  # })
    
-   ## jitter points for 2 zoom levels
-   
-   sample_jitter1 <- reactive({
-     # if(nrow(sample_filtered()>0)) {
-     st_jitter(sample_filtered(), factor = 0.015) %>%
-       st_transform(crs = 4326)
-     # }
+   sample_filtered2 <- reactive({
+     if (input$point_type == "Wells") {
+       req(input$time_series)
+       if (input$time_series == "Show All Samples") {
+         sample_app2 %>%
+           filter(salinity_classification %in% input$salinity_class) %>% 
+           # count # samples per well
+           group_by(well_id) %>%
+           mutate(n_samples = n()) %>%
+           distinct(well_id, .keep_all = TRUE) %>%
+           ungroup()
+       } else if (input$time_series == "Yes") {
+         sample_app2 %>%
+           filter(timeseries_stage %in% input$time_category,
+                  salinity_classification %in% input$salinity_class) %>%
+           # count # samples per well
+           group_by(well_id) %>%
+           mutate(n_samples = n()) %>%
+           distinct(well_id, .keep_all = TRUE) %>%
+           ungroup()
+       } else {
+         sample_app2 %>%
+           filter(timeseries_stage == "none",
+                  salinity_classification %in% input$salinity_class) %>%
+           # count # samples per well
+           group_by(well_id) %>%
+           mutate(n_samples = n()) %>%
+           distinct(well_id, .keep_all = TRUE) %>%
+           ungroup()
+       }
+       
+     } else {
+       sample_app2 %>% 
+         filter(salinity_conductivity_m_s_cm %inrange% input$salinity_range,
+                perc_sulfide_producers %inrange% input$sulfide_range,
+                perc_acetate_producers %inrange% input$acetate_range,
+                perc_methanogens %inrange% input$methanogen_range)
+     }
+     
    })
-   
-   sample_jitter2 <- reactive({
-     st_jitter(sample_filtered(), factor = 0.005) %>%
-       st_transform(crs = 4326)
-   })
- 
   
   
   ## time series plotly ----
@@ -499,15 +569,10 @@ server <- function(input, output, session) {
           "#B796C6"
         ),
         name = ~ sample_app$shale_basin,
-        #legendgroup = ~ sample_app$shale_basin,
         type = 'scatter',
         mode = 'lines+markers',
         connectgaps = TRUE
-      ) #%>%
-    # layout(showlegend = TRUE,
-    #        xaxis = list(title = "Days Since Frack")) %>%
-    # style(showlegend = FALSE,
-    #       traces = c(2:5, 8:12, 13:15, 17, 19, 21:22, 24, 26, 28))
+      ) 
     
     subplot(
       fig_1,
@@ -540,7 +605,6 @@ server <- function(input, output, session) {
         stroke = FALSE,
         fillOpacity = 0.65,
         fillColor = ~ pal_basin(NAME),
-        #fillColor = "#91B187",
         options = pathOptions(pane = "Basins"),
         popup = paste("Basin:",
                       sediment_basin$NAME)
@@ -603,7 +667,7 @@ server <- function(input, output, session) {
    observe({
      input$nav
      #observeEvent(sample_filtered(), {
-     if (nrow(sample_filtered()) == 0 | is.null(sample_filtered())) {
+     if (nrow(sample_filtered1()) == 0 | is.null(sample_filtered1())) {
        leafletProxy('sample_map') %>%
          clearGroup(c("Wells", "jitter2")) %>%
          clearControls()
@@ -612,7 +676,7 @@ server <- function(input, output, session) {
          clearGroup(c("Wells", "jitter2")) %>%
          clearControls() %>%
          addCircleMarkers(
-           data = sample_jitter1(),
+           data = sample_filtered1(),
            group = "Wells",
            radius = if (input$point_type == "Wells") {
              ~ sqrt(n_samples) * 3
@@ -620,7 +684,7 @@ server <- function(input, output, session) {
              if (input$sample_var_size == "") {
                6
              } else {
-               ~ sqrt(sample_jitter1()[[input$sample_var_size]])
+               ~ sqrt(sample_filtered1()[[input$sample_var_size]])
              }
            },
        #radius = ~ sqrt(n_samples) * 3,
@@ -634,61 +698,61 @@ server <- function(input, output, session) {
            popup =  if (input$point_type == "Wells") {
              paste(
                "Well:",
-               sample_filtered()$well_id,
+               sample_filtered1()$well_id,
                "<br>",
-               paste("Basin:", sample_filtered()$shale_basin),
+               paste("Basin:", sample_filtered1()$shale_basin),
                "<br>",
-               paste("Play:", sample_filtered()$shale_play),
+               paste("Play:", sample_filtered1()$shale_play),
                "<br>",
-               paste("Number of Samples:", sample_filtered()$n_samples),
+               paste("Number of Samples:", sample_filtered1()$n_samples),
                "<br>",
                paste(
                  "Range of days since frack:",
                  paste0(
-                   sample_filtered()$min_days_since_frack,
+                   sample_filtered1()$min_days_since_frack,
                    "-",
-                   sample_filtered()$max_days_since_frack
+                   sample_filtered1()$max_days_since_frack
                  )
                ),
-               '<img src=', paste0(sample_filtered()$well_id, "_area_plot.png"),
+               '<img src=', paste0(sample_filtered1()$well_id, "_area_plot.png"),
                ' width="300"',
                '>'
              )
            } else {
              paste(
                "Well:",
-               sample_filtered()$well_id,
+               sample_filtered1()$well_id,
                "<br>",
-               paste("Sample:", sample_filtered()$sample_id),
+               paste("Sample:", sample_filtered1()$sample_id),
                "<br>",
                paste(
                  "Time Series Stage:",
-                 sample_filtered()$timeseries_stage
+                 sample_filtered1()$timeseries_stage
                ),
                "<br>",
                paste(
                  "Salinity Classification:",
-                 sample_filtered()$salinity_classification
+                 sample_filtered1()$salinity_classification
                ),
                "<br>",
                paste(
                  "Salinity Conductivity (mS/cm):",
-                 round(sample_filtered()$salinity_conductivity_m_s_cm)
+                 round(sample_filtered1()$salinity_conductivity_m_s_cm)
                ),
                "<br>",
                paste(
                  "Percent Sulfide Producers:",
-                 round(sample_filtered()$perc_sulfide_producers)
+                 round(sample_filtered1()$perc_sulfide_producers)
                ),
                "<br>",
                paste(
                  "Percent Acetate Producers:",
-                 round(sample_filtered()$perc_acetate_producers)
+                 round(sample_filtered1()$perc_acetate_producers)
                ),
                "<br>",
                paste(
                  "Percent Methanogens:",
-                 round(sample_filtered()$perc_methanogens)
+                 round(sample_filtered1()$perc_methanogens)
                )
                # '<img src=', paste0(sample_filtered()$well_id, "_area_plot.png"),
                # ' width="300"',
@@ -697,7 +761,7 @@ server <- function(input, output, session) {
            }
          ) %>%
          addCircleMarkers(
-           data = sample_jitter2(),
+           data = sample_filtered2(),
            group = "jitter2",
            radius = if (input$point_type == "Wells") {
              ~ sqrt(n_samples) * 3
@@ -705,7 +769,7 @@ server <- function(input, output, session) {
              if (input$sample_var_size == "") {
                6
              } else {
-               ~ sqrt(sample_jitter1()[[input$sample_var_size]])
+               ~ sqrt(sample_filtered2()[[input$sample_var_size]])
              }
            },
            #radius = ~ sqrt(n_samples) * 3,
@@ -718,58 +782,58 @@ server <- function(input, output, session) {
            popup =  if (input$point_type == "Wells") {
              paste(
                "Well:",
-               sample_filtered()$well_id,
+               sample_filtered2()$well_id,
                "<br>",
-               paste("Basin:", sample_filtered()$shale_basin),
+               paste("Basin:", sample_filtered2()$shale_basin),
                "<br>",
-               paste("Play:", sample_filtered()$shale_play),
+               paste("Play:", sample_filtered2()$shale_play),
                "<br>",
-               paste("Number of Samples:", sample_filtered()$n_samples),
+               paste("Number of Samples:", sample_filtered2()$n_samples),
                "<br>",
                paste(
                  "Range of days since frack:",
                  paste0(
-                   sample_filtered()$min_days_since_frack,
+                   sample_filtered2()$min_days_since_frack,
                    "-",
-                   sample_filtered()$max_days_since_frack
+                   sample_filtered2()$max_days_since_frack
                  )
                )
              )
            } else {
              paste(
                "Well:",
-               sample_filtered()$well_id,
+               sample_filtered2()$well_id,
                "<br>",
-               paste("Sample:", sample_filtered()$sample_id),
+               paste("Sample:", sample_filtered2()$sample_id),
                "<br>",
                paste(
                  "Time Series Stage:",
-                 sample_filtered()$timeseries_stage
+                 sample_filtered2()$timeseries_stage
                ),
                "<br>",
                paste(
                  "Salinity Classification:",
-                 sample_filtered()$salinity_classification
+                 sample_filtered2()$salinity_classification
                ),
                "<br>",
                paste(
                  "Salinity Conductivity (mS/cm):",
-                 round(sample_filtered()$salinity_conductivity_m_s_cm)
+                 round(sample_filtered2()$salinity_conductivity_m_s_cm)
                ),
                "<br>",
                paste(
                  "Percent Sulfide Producers:",
-                 round(sample_filtered()$perc_sulfide_producers)
+                 round(sample_filtered2()$perc_sulfide_producers)
                ),
                "<br>",
                paste(
                  "Percent Acetate Producers:",
-                 round(sample_filtered()$perc_acetate_producers)
+                 round(sample_filtered2()$perc_acetate_producers)
                ),
                "<br>",
                paste(
                  "Percent Methanogens:",
-                 round(sample_filtered()$perc_methanogens)
+                 round(sample_filtered2()$perc_methanogens)
                )
              )
            }
@@ -778,9 +842,9 @@ server <- function(input, output, session) {
          groupOptions("jitter2", zoomLevels = 7:20) %>%
          addLegendSize(
            values = if (input$point_type == "Wells") {
-             sample_filtered()$n_samples
+             sample_filtered1()$n_samples
            } else {
-             sample_filtered()[[input$sample_var_size]]
+             sample_filtered1()[[input$sample_var_size]]
            },
            color = 'white',
            fillColor = 'white',
@@ -833,7 +897,7 @@ server <- function(input, output, session) {
 
  
   
-  ## Genome Map -----
+# Genome Explorer -----------------
    
    ### genome filter ----------------
    taxa_mod <- callModule(
@@ -1103,155 +1167,82 @@ server <- function(input, output, session) {
   
   ## Execute tool ----
   
+  results <- reactiveVal(NULL)
+  
+  dark_theme <- theme(
+    text = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    panel.background = element_rect(fill = 'transparent'),
+    plot.background = element_rect(fill = 'transparent', color = NA),
+    legend.background = element_rect(fill = 'transparent'),
+    legend.box.background = element_rect(fill = 'transparent')
+  )
+  
   observeEvent(input$run_tool, {
-    #req(user_data())
-    
+    results(NULL)
     shinycssloaders::showPageSpinner(type = 1, color = "#94b674")
-    Sys.sleep(3)
-   
-    output$learn_more <- renderText({"Learn more about interpreting your MAP-FRAC linkage results by downloading the full report"})
-
-    tool_outputs <- reactive({
-      run_matching_tool(mag_file = mag_file, feat = user_data())
-    })
     
-    plots <- reactive({
-      generate_plots(
-        tool_outputs()$match_level_counts,
-        tool_outputs()$feat_filt_relab_long,
+    feat <- user_data()
+    
+    future({
+      tool_out <- run_matching_tool(mag_file = mag_file, feat = feat)
+      plots <- generate_plots(
+        tool_out$match_level_counts,
+        tool_out$feat_filt_relab_long,
         interactive = TRUE
       )
+      list(tool_out = tool_out, plots = plots)
+    }) %...>% (function(res) {
+      results(res)
+      shinycssloaders::hidePageSpinner()
+    }) %...!% (function(err) {
+      shinycssloaders::hidePageSpinner()
+      showNotification(paste("Error:", err$message), type = "error")
     })
-    
-
-    output$data_output <- DT::renderDataTable(
-      tool_outputs()$merged_data_OUTPUT,
-      options = list(
-        paging = FALSE,
-        pageLength = 10,
-        autoWidth = TRUE
-      )
-    )
-    
-  
-    
-    output$p1 <- renderPlotly({
-      plots()$p1 %>%
-        layout(
-          plot_bgcolor = 'transparent',
-          paper_bgcolor = 'transparent',
-          font = list(color = 'white')
-        )
-      })
-    
-    output$p2 <- renderPlotly({
-      plots()$p2 %>%
-        layout(
-          plot_bgcolor = 'transparent',
-          paper_bgcolor = 'transparent',
-          font = list(color = 'white')
-        )
-    })
-    
-    
-    output$p3 <- renderPlotly({
-      p3 <-  plots()$p3 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
-        )
-      
-      ggplotly(p3)
-      
-    })
-    
-    
-    output$p4 <- renderPlotly({
-      p4 <-  plots()$p4 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
-        )
-      
-      ggplotly(p4)
-      
-    })
-    
-    
-    output$p5 <- renderPlotly({
-      p5 <-  plots()$p5 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
-        )
-      
-      ggplotly(p5)
-      
-    })
-    
-    
-    output$p6 <- renderPlotly({
-      p6 <-  plots()$p6 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
-        )
-      
-      ggplotly(p6)
-      
-    })
-    
-    
-    output$p7 <- renderPlotly({
-      p7 <-  plots()$p7 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
-        )
-      
-      ggplotly(p7)
-      
-    })
-    
-    shinycssloaders::hidePageSpinner()
-    
-    
   })
+  
+  output$learn_more <- renderText({
+    req(results())
+    "Learn more about interpreting your MAP-FRAC linkage results by downloading the full report"
+  })
+  
+  output$data_output <- DT::renderDataTable({
+    req(results())
+    results()$tool_out$merged_data_OUTPUT
+  }, options = list(paging = FALSE, pageLength = 10, autoWidth = TRUE))
+  
+  output$p1 <- renderPlotly({
+    req(results())
+    results()$plots$p1 %>%
+      layout(plot_bgcolor = 'transparent', paper_bgcolor = 'transparent', font = list(color = 'white'))
+  })
+  
+  output$p2 <- renderPlotly({
+    req(results())
+    results()$plots$p2 %>%
+      layout(plot_bgcolor = 'transparent', paper_bgcolor = 'transparent', font = list(color = 'white'))
+  })
+  
+  output$p3 <- renderPlotly({
+    req(results())
+    ggplotly(results()$plots$p3 + dark_theme)
+  })
+  
+  output$p4 <- renderPlotly({
+    req(results())
+    ggplotly(results()$plots$p4 + dark_theme)
+  })
+  
+  output$p5 <- renderPlotly({
+    req(results())
+    ggplotly(results()$plots$p5 + dark_theme)
+  })
+  
+  output$p6 <- renderPlotly({
+    req(results())
+    ggplotly(results()$plots$p6 + dark_theme)
+  })
+  
   
   
   ## Generate Report -----
@@ -1302,7 +1293,6 @@ server <- function(input, output, session) {
   })
   
   
-  ## this is not understanding 'tool_outputs()', need to fix
   output$tool_data <- downloadHandler(
     filename = function() {
       paste0("linked_data_", Sys.time(), ".zip")

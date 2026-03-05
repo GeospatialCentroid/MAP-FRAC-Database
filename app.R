@@ -16,7 +16,10 @@ library(viridis)
 library(ggrepel)
 library(shinycssloaders)
 library(glue)
-#library(datamods)
+library(future)
+library(promises)
+plan(multisession)
+
 
 # source tool functions
 purrr::map(list.files(
@@ -1164,156 +1167,82 @@ server <- function(input, output, session) {
   
   ## Execute tool ----
   
+  results <- reactiveVal(NULL)
+  
+  dark_theme <- theme(
+    text = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    panel.background = element_rect(fill = 'transparent'),
+    plot.background = element_rect(fill = 'transparent', color = NA),
+    legend.background = element_rect(fill = 'transparent'),
+    legend.box.background = element_rect(fill = 'transparent')
+  )
+  
   observeEvent(input$run_tool, {
-    #req(user_data())
-    
+    results(NULL)
     shinycssloaders::showPageSpinner(type = 1, color = "#94b674")
-    Sys.sleep(3)
-   
-    output$learn_more <- renderText({"Learn more about interpreting your MAP-FRAC linkage results by downloading the full report"})
-
-    tool_outputs <- reactive({
-      run_matching_tool(mag_file = mag_file, feat = user_data())
-    })
     
-    plots <- reactive({
-      generate_plots(
-        tool_outputs()$match_level_counts,
-        tool_outputs()$feat_filt_relab_long,
+    feat <- user_data()
+    
+    future({
+      tool_out <- run_matching_tool(mag_file = mag_file, feat = feat)
+      plots <- generate_plots(
+        tool_out$match_level_counts,
+        tool_out$feat_filt_relab_long,
         interactive = TRUE
       )
+      list(tool_out = tool_out, plots = plots)
+    }) %...>% (function(res) {
+      results(res)
+      shinycssloaders::hidePageSpinner()
+    }) %...!% (function(err) {
+      shinycssloaders::hidePageSpinner()
+      showNotification(paste("Error:", err$message), type = "error")
     })
-    
-  
-
-    output$data_output <- DT::renderDataTable(
-      tool_outputs()$merged_data_OUTPUT,
-      options = list(
-        paging = FALSE,
-        pageLength = 10,
-        autoWidth = TRUE
-      )
-    )
-    
-  
-    
-    output$p1 <- renderPlotly({
-      plots()$p1 %>%
-        layout(
-          plot_bgcolor = 'transparent',
-          paper_bgcolor = 'transparent',
-          font = list(color = 'white')
-        )
-      })
-    
-    output$p2 <- renderPlotly({
-      plots()$p2 %>%
-        layout(
-          plot_bgcolor = 'transparent',
-          paper_bgcolor = 'transparent',
-          font = list(color = 'white')
-        )
-    })
-    
-    
-    output$p3 <- renderPlotly({
-      p3 <-  plots()$p3 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
-        )
-
-      ggplotly(p3)
-      
-    })
-    
-    
-    output$p4 <- renderPlotly({
-      p4 <-  plots()$p4 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
-        )
-      
-      ggplotly(p4)
-      
-    })
-    
-    
-    output$p5 <- renderPlotly({
-      p5 <-  plots()$p5 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
-        )
-      
-      ggplotly(p5)
-      
-    })
-    
-    
-    output$p6 <- renderPlotly({
-      p6 <-  plots()$p6 +
-        theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white"),
-          panel.background = element_rect(fill = 'transparent'),
-          #transparent panel bg
-          plot.background = element_rect(fill = 'transparent', color =
-                                           NA),
-          legend.background = element_rect(fill = 'transparent'),
-          #transparent legend bg
-          legend.box.background = element_rect(fill = 'transparent')
-        )
-      
-      ggplotly(p6)
-      
-    })
-    
-    
-    # output$p7 <- renderPlotly({
-    #   p7 <-  plots()$p7 +
-    #     theme(
-    #       text = element_text(color = "white"),
-    #       axis.text = element_text(color = "white"),
-    #       panel.background = element_rect(fill = 'transparent'),
-    #       #transparent panel bg
-    #       plot.background = element_rect(fill = 'transparent', color =
-    #                                        NA),
-    #       legend.background = element_rect(fill = 'transparent'),
-    #       #transparent legend bg
-    #       legend.box.background = element_rect(fill = 'transparent')
-    #     )
-    #   
-    #   ggplotly(p7)
-    #   
-    # })
-    # 
-    shinycssloaders::hidePageSpinner()
-    
-    
   })
+  
+  output$learn_more <- renderText({
+    req(results())
+    "Learn more about interpreting your MAP-FRAC linkage results by downloading the full report"
+  })
+  
+  output$data_output <- DT::renderDataTable({
+    req(results())
+    results()$tool_out$merged_data_OUTPUT
+  }, options = list(paging = FALSE, pageLength = 10, autoWidth = TRUE))
+  
+  output$p1 <- renderPlotly({
+    req(results())
+    results()$plots$p1 %>%
+      layout(plot_bgcolor = 'transparent', paper_bgcolor = 'transparent', font = list(color = 'white'))
+  })
+  
+  output$p2 <- renderPlotly({
+    req(results())
+    results()$plots$p2 %>%
+      layout(plot_bgcolor = 'transparent', paper_bgcolor = 'transparent', font = list(color = 'white'))
+  })
+  
+  output$p3 <- renderPlotly({
+    req(results())
+    ggplotly(results()$plots$p3 + dark_theme)
+  })
+  
+  output$p4 <- renderPlotly({
+    req(results())
+    ggplotly(results()$plots$p4 + dark_theme)
+  })
+  
+  output$p5 <- renderPlotly({
+    req(results())
+    ggplotly(results()$plots$p5 + dark_theme)
+  })
+  
+  output$p6 <- renderPlotly({
+    req(results())
+    ggplotly(results()$plots$p6 + dark_theme)
+  })
+  
   
   
   ## Generate Report -----

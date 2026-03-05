@@ -1,7 +1,7 @@
 ---
 title: "MAP-FRAC database: MAG-linking tool report"
 output: pdf_document
-#date: "Report generated on `r Sys.Date()` from https://geocentroid.shinyapps.io/MAP-FRAC-Database/"
+#date: "Report generated on `r Sys.Date()` from https://apps.gis.colostate.edu/MAP-FRAC-Database/"
 params:
   mag_file: NA
   data: NA
@@ -27,7 +27,7 @@ plots <- generate_plots(match_level_counts = mlc, feat_filt_relab_long = ffrl, i
 ```
 
 ::: {.center data-latex=""}
-Report generated on `r Sys.Date()` from <https://geocentroid.shinyapps.io/MAP-FRAC-Database/>
+Report generated on `r Sys.Date()` from <https://apps.gis.colostate.edu/MAP-FRAC-Database/>
 :::
 
 <br>

@@ -14,6 +14,17 @@ nav.navbar.navbar-default.navbar-static-top {
     background-color: #7198ab !important;
 }
 
+/* remove extra space at bottom of footer */
+.tab-content {
+  height: auto !important;
+}
+
+.container-all {
+  min-height: 0 !important;
+  height: auto !important;
+  padding-bottom: 1rem !important;
+}
+
 /* hacky way to make leaflet darktheme */
 .leaflet-layer,
 .leaflet-control-zoom-in,

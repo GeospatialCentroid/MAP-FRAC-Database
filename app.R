@@ -355,6 +355,46 @@ ui <- fluidPage(
           DT::dataTableOutput("data_output", height = "200px"))
       )
     )
+  ),
+  hr(),
+  div(
+    class = "pt-2",
+    div(
+      class = "row justify-content-center",
+      # Left column - Logo and developer info
+      div(
+        class = "col-md-6 text-center mb-3",
+        p(
+          style = "color: #CCCCCC; margin-bottom: 10px; font-size: 0.85rem;",
+          paste("Application developed by the Geospatial Centroid at CSU. Last Updated", format(Sys.Date(), "%B %Y"))
+        ),
+        tags$img(
+          src = "Centroid_logo.png",
+          alt = "Geospatial Centroid Logo",
+          style = "max-width: 200px; height: auto;"
+        )
+      ),
+      # Right column - Citation and contact
+      div(
+        class = "col-md-6 text-center",
+        p(
+          style = "color: #CCCCCC; margin-bottom: 10px; font-size: 0.85rem;",
+          tags$strong("Citation: "),
+          "Amundson et al. al 2026 ",
+          tags$em("(Under Review)")
+        ),
+        p(
+          style = "color: #CCCCCC; font-size: 0.85rem;",
+          tags$strong("Contact: "),
+          "Kaela Amundson, ",
+          tags$a(
+            href = "mailto:Kaela.Amundson@colostate.edu",
+            "Kaela.Amundson@colostate.edu",
+            style = "color: #00bc8c;"
+          )
+        )
+      )
+    )
   )
 )
 
@@ -1324,7 +1364,6 @@ server <- function(input, output, session) {
   })
   
   
-  ## this is not understanding 'tool_outputs()', need to fix
   output$tool_data <- downloadHandler(
     filename = function() {
       paste0("linked_data_", Sys.time(), ".zip")

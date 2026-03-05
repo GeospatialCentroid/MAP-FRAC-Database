@@ -10,5 +10,13 @@ MAP-FRAC is a database of metagenome assembled genomes (MAGs) recovered from hyd
 
 (3) **‘MAG Linking Tool’** provides insights into the functional composition of shale microbiomes from amplicon datasets without needing to generate costly metagenomic sequencing data. This is an online-executable tool that connects 16S rRNA gene amplicon datasets to the MAG database presented here based on taxonomic classification. Users upload a standardized ASV table and the tool outputs interactive visualizations, downloadable data tables, and a PDF report summarizing successful linkages with caveats for interpretation of results.
 
+**Description of data in this repository:** 
+
+`data/` contains all shapefiles for shale basin and formations and underlying data for the Sample Explorer and Genome Explorer layers of the shiny app. Specifically, SAMPLE_geospatial_metadata_3.28.24.xlsx contains metadata on samples included in this study, while GENOME_geospatial_metadata_02.17.2026.xlsx provides information on the 978 MAGs described here. 
+
+`tool` contains all files underlying the execution of the MAG linking tool, including MAG metadata (shale_MAGS_978_v2_02.17.2026.txt) and an example dataset (permian_feature_table_w_tax.txt) that can be directly input into the MAG linking tool on the MAP-FRAC interface. 
+
+More information on the MAG linking tool and R code that can be executed independently from the MAP-FRAC shiny app is documented here: https://github.com/kkamundson/shale_biogeo/tree/main/MAG_linking_tool 
+
 
 **If you use the MAG-linking MAP-FRAC tool, please cite Amundson et al., 2026 (In review).**

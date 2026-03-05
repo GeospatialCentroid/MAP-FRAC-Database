@@ -1,7 +1,9 @@
 ---
-title: "Explore and clean input data"
+title: "Code to clean and explore data"
 author: "Caitlin Mothes"
 ---
+
+# Workflow to clean and prep all data for the shiny app
 
 ```{r}
 library(tidyverse)
@@ -125,7 +127,7 @@ sample_app <- sample_app %>%
   filter(sample_type != "input")
 ```
 
-## Genome Explorer Data 
+## Genome Explorer Data
 
 ### Relative abudance data
 
@@ -142,13 +144,10 @@ Clean genome data and join to basin shapefile
 
 ```{r}
 genome_app <- genome_joined %>% 
-  # remove "Basin" from name and change Denver site name to match
-  # mutate(Basin = str_replace(basin, " Basin", "") %>% 
-  #          str_replace("DJ", "Denver")) %>% 
-           # trailing spaces were causing errors in join
-            #str_remove_all(" ")) %>% 
   mutate(across(domain:species, ~str_remove(.x, ".*__")))
 ```
+
+Visualize for app:
 
 ```{r}
 # **will need to do this within the app using filtered data for 'genome_clean'
@@ -162,17 +161,7 @@ genome_app %>%
   summarise(avg_rel_abundance = mean(max_rel_abundance)) %>% 
   right_join(sediment_basin, by = c("Basin" = "NAME")) %>%
   View()
-  # create column for pop up
-  # mutate(popup = paste(
-  #           "Basin:",
-  #           basin_genome()$Basin,
-  #           "<br>",
-  #             "Average MAG Relative Abundance:",
-  #             round(basin_genome()$avg_rel_abundance, 2)
-  #           
-  #           )) %>% 
-  # st_as_sf() %>% 
-  # View()
+
 
 # plays
 genome_app %>% 
@@ -227,18 +216,12 @@ core_app <- mag_cores %>%
 mapview(core_app)
 ```
 
-
-## Save data for app
+## Save all data for app
 
 ```{r}
 #save updated data
 save(sample_app, sample_inputs, play_basin, sediment_basin, genome_app, mag_cores, file = "data/app_data_Update.RData")
 
-
-#save(sample_app, genome_app, basin_sample, basin_genome, file = "data/app_data.RData")
-
-# st_write(sample_summary, "data/sample_app.shp", append = FALSE)
-# st_write(genome_sf, "data/genome_app.shp", append = FALSE)
 ```
 
 ## Timeseries Plot
@@ -246,11 +229,6 @@ save(sample_app, sample_inputs, play_basin, sediment_basin, genome_app, mag_core
 ```{r}
 
 fig_1 <- sample_app %>% 
- # filter(days)
-    # mutate(Basin = factor(Basin, levels = c("WesternGulf", "Permian", "Appalachian", 
-    #                                         "Anadarko", "Dener", "PowderRiver", "Michigan")),
-    #        well_ID = fct_reorder(well_ID, max_days_since_frack)) %>%
- # arrange(Basin, well_ID, days_since_frack) %>% 
 plotly::plot_ly(colors = "Dark2") %>% 
   add_trace(x = sample_app$days_since_frack,
             y = sample_app$well_id,
@@ -263,17 +241,11 @@ plotly::plot_ly(colors = "Dark2") %>%
             connectgaps = TRUE) %>% 
   layout(showlegend = TRUE, yaxis = list(type = "category",
   categoryorder = "array", categoryarray = sort(unique(sample_app$shale_basin)))) %>% 
-         
-  #categoryarray = sort(unique(sample_app$Basin))) %>% 
+
   # hacky way to get one trace per group in legend
   style(showlegend = FALSE, traces = c(1:4, 7:11, 13:16, 17, 21, 22:24, 26, 28))
 
 fig_2 <-  sample_app %>% 
- # filter(days)
-    # mutate(Basin = factor(Basin, levels = c("WesternGulf", "Permian", "Appalachian", 
-    #                                         "Anadarko", "Dener", "PowderRiver", "Michigan")),
-    #        well_ID = fct_reorder(well_ID, max_days_since_frack)) %>%
- # arrange(Basin, well_ID, days_since_frack) %>% 
 plotly::plot_ly(colors = "Dark2") %>% 
   add_trace(x = sample_app$days_since_frack,
             y = sample_app$well_id,
@@ -286,8 +258,6 @@ plotly::plot_ly(colors = "Dark2") %>%
             connectgaps = TRUE) %>% 
   layout(showlegend = TRUE, yaxis = list(type = "category",
   categoryorder = "array", categoryarray = sort(unique(sample_app$shale_basin)))) %>% 
-         
-  #categoryarray = sort(unique(sample_app$Basin))) %>% 
   # hacky way to get one trace per group in legend
   style(showlegend = FALSE, traces = c(1:4, 7:11, 13:16, 17, 21, 22:24, 26, 28))
 

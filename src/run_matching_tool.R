@@ -1,10 +1,41 @@
-library(dplyr)
-library(tidyr)
-
+#' Match ASVs to MAGs across taxonomic levels
+#'
+#' @description Links amplicon sequence variants (ASVs) from a feature table to
+#'   metagenome-assembled genomes (MAGs) by sequentially attempting matches at
+#'   full taxonomy, genus, family, and order levels. Samples with fewer than 100
+#'   total counts are removed prior to relative abundance conversion. Returns
+#'   matched data, match level summaries, and relative abundance data for
+#'   downstream plotting.
+#'
+#' @param mag_file A data frame of MAG metadata. Must contain columns
+#'   \code{MAG_FULL_tax}, \code{MAG}, \code{compl}, \code{basin},
+#'   \code{contam}, \code{sPROD}, \code{METHANO}, \code{rhodanase},
+#'   \code{phsA}, and \code{dsrB}.
+#' @param feat A data frame representing the ASV feature table. The first column
+#'   is treated as ASV IDs, intermediate columns are sample counts, and the last
+#'   column must be named \code{taxonomy} containing semicolon-delimited
+#'   taxonomic strings.
+#'
+#' @return A named list with four elements:
+#'   \describe{
+#'     \item{merged_data_OUTPUT}{Data frame of ASVs with their matched MAG and
+#'       functional annotations.}
+#'     \item{match_level_counts}{Summary data frame of match counts and
+#'       percentages per taxonomic level.}
+#'     \item{feat_filt_relab_long}{Long-format relative abundance data frame
+#'       with taxonomic and MAG annotations joined, for use in
+#'       \code{generate_plots()}.}
+#'     \item{removed_samples_numb}{Integer count of samples removed due to low
+#'       read counts (<100).}
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' result <- run_matching_tool(mag_file = shale_mags, feat = feature_table)
+#' result$match_level_counts
+#' plots <- generate_plots(result$match_level_counts, result$feat_filt_relab_long)
+#' }
 run_matching_tool <- function(mag_file, feat) {
-  # Read in files
-  #mags <- read.delim(mag_file, header = TRUE)
-  #feat <- read.delim(feature_file, header = TRUE, skip = 1)
   
   # Format MAG table
   mags <- mag_file %>%
@@ -130,10 +161,3 @@ run_matching_tool <- function(mag_file, feat) {
     removed_samples_numb = ncol(removed_samples) - 2
   )
 }
-
-# Example usage:
-# result <- run_matching_tool("tool/shale_MAGs_978.txt", read.delim("tool/feature_table_w_tax.txt", header = TRUE, skip = 1))
-# merged_data_OUTPUT <- result$merged_data_OUTPUT
-# match_level_counts <- result$match_level_counts
-# feat_filt_relab_long <- result$feat_filt_relab_long
-# removed_samples_numb <- result$removed_samples_numb
